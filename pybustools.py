@@ -1,4 +1,25 @@
 from busio import read_binary_bus, read_text_bus
+import pathlib
+import busio
+
+class Bus():
+
+    def __init__(self, folder, bus_name='output.corrected.sort.bus', ec_name='matrix.ec', transcript_name='transcripts.txt'):
+        self.folder = pathlib.Path(folder)
+        self.bus_file = self.folder / bus_name
+        self.ec_file = self.folder / ec_name
+        self.transcript_file = self.folder / transcript_name
+
+        self.ec_dict = busio.read_matrix_ec(self.ec_file)
+        self.transcript_dict = busio.read_matrix_ec(self.transcript_file)
+
+    def iterate_bus(self):
+        return read_binary_bus(self.bus_file)
+
+    def iterate_cells(self):
+        return iterate_cells_of_busfile(self.bus_file, is_binary=True)
+
+
 
 def iterate_cells_of_busfile(fname, is_binary=True):
     """
@@ -29,45 +50,11 @@ def iterate_cells_of_busfile(fname, is_binary=True):
 
     # emitting the final cell
     yield current_cell, current_info
-    return
-
-
-# def iterate_cells_of_busfile_old(fname):
-#     """
-#     runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
-#     and yield it as `cb,info_list`
-#     """
-#     with open(fname, 'r') as fh:
-#         # first line to get going
-#         line = fh.readline()
-#         cb, umi, ec, count = read_text_bus_entry(line)
-#
-#         current_cell = cb
-#         current_info = [(umi, ec, count)]
-#
-#         for line in fh:
-#             cb, umi, ec, count = read_text_bus_entry(line)
-#
-#             if cb != current_cell:
-#
-#                 # we're finished with one cells, yield it and start the next
-#                 yield current_cell, current_info
-#
-#                 # reset for the next cell
-#                 # process results and reset
-#                 current_cell = cb
-#                 current_info = [(umi, ec, count)]
-#
-#             else:
-#                 current_info.append((umi, ec, count))
-#
-#         # emitting the final cell
-#         yield current_cell, current_info
 
 
 def iterate_bus_cells_pairs(fname1, fname2, is_binary=True):
     """
-    bustfiles must be sorted!!
+    busfiles must be sorted!!
 
     iterate over the files until we have a matchign pair of cells
     collect the info on both cells and advance to the next pair

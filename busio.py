@@ -66,19 +66,11 @@ def read_text_bus(fname):
     """
     with open(fname, 'r') as fh:
         for line in fh:
-            cb, umi, ec, count, flag = read_text_bus_entry(line)
+            cb, umi, ec, count = line.split()
+            ec = int(ec)
+            count = int(count)
+            flag = 0  # TODO Flag fixed!!
             yield cb, umi, ec, count, flag
-
-
-def read_text_bus_entry(line):
-    """
-    read a plaintext bus
-    """
-    cb, umi, ec, count = line.split()
-    ec = int(ec)
-    count = int(count)
-    flag = 0  # TODO Flag fixed!!
-    return cb, umi, ec, count, flag
 
 
 def read_matrix_ec(fname):
@@ -93,6 +85,7 @@ def read_matrix_ec(fname):
             transcripts = [int(_) for _ in transcript_list.split(',')]
             D[ec] = transcripts
     return D
+
 
 def read_transcripts(fname):
     """
