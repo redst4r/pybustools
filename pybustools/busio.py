@@ -97,7 +97,7 @@ def read_transcripts(fname):
     D = {}
     with open(fname, 'r') as fh:
         for i, line in enumerate(fh):
-            D[i] = line
+            D[i] = line.strip()
     return D
 
 

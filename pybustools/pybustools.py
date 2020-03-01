@@ -1,6 +1,5 @@
-from busio import read_binary_bus, read_text_bus
+from pybustools import busio
 import pathlib
-import busio
 
 class Bus():
 
@@ -11,10 +10,10 @@ class Bus():
         self.transcript_file = self.folder / transcript_name
 
         self.ec_dict = busio.read_matrix_ec(self.ec_file)
-        self.transcript_dict = busio.read_matrix_ec(self.transcript_file)
+        self.transcript_dict = busio.read_transcripts(self.transcript_file)
 
     def iterate_bus(self):
-        return read_binary_bus(self.bus_file)
+        return busio.read_binary_bus(self.bus_file)
 
     def iterate_cells(self):
         return iterate_cells_of_busfile(self.bus_file, is_binary=True)
@@ -27,9 +26,9 @@ def iterate_cells_of_busfile(fname, is_binary=True):
     and yield it as `cb,info_list`
     """
     if is_binary:
-        bus_iterator = read_binary_bus(fname)
+        bus_iterator = busio.read_binary_bus(fname)
     else:
-        bus_iterator = read_text_bus(fname)
+        bus_iterator = busio.read_text_bus(fname)
 
     # get the first entry to get started
     cb, umi, ec, count, flag = next(bus_iterator)
