@@ -1,6 +1,9 @@
 import struct
 from functools import partial
 import gmpy2
+import collections
+
+Bus_record = collections.namedtuple('BUSRecord', 'CB UMI EC COUNT FLAG')
 
 def _decode_int_to_ACGT(the_int, seq_len):
     """
@@ -56,7 +59,9 @@ def read_binary_bus(fname):
             assert pad == 0
             cb_str = _decode_int_to_ACGT(cb, cb_len)
             umi_str = _decode_int_to_ACGT(umi, umi_len)
-            yield cb_str, umi_str, ec, count, flags
+
+            record = Bus_record(CB=cb_str, UMI=umi_str, EC=ec, COUNT=count, FLAG=flags)
+            yield record
 
 
 def read_text_bus(fname):
@@ -70,7 +75,8 @@ def read_text_bus(fname):
             ec = int(ec)
             count = int(count)
             flag = 0  # TODO Flag fixed!!
-            yield cb, umi, ec, count, flag
+            record = Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flag)
+            yield record
 
 
 def read_matrix_ec(fname):
