@@ -3,30 +3,34 @@ import pathlib
 
 class Bus():
 
-    def __init__(self, folder, bus_name='output.corrected.sort.bus', ec_name='matrix.ec', transcript_name='transcripts.txt'):
+    def __init__(self, folder,
+                 bus_name='output.corrected.sort.bus',
+                 ec_name='matrix.ec',
+                 transcript_name='transcripts.txt',
+                 decode_seq=True):
         self.folder = pathlib.Path(folder)
         self.bus_file = self.folder / bus_name
         self.ec_file = self.folder / ec_name
         self.transcript_file = self.folder / transcript_name
-
+        self.decode_seq=decode_seq
         self.ec_dict = busio.read_matrix_ec(self.ec_file)
         self.transcript_dict = busio.read_transcripts(self.transcript_file)
 
     def iterate_bus(self):
-        return busio.read_binary_bus(self.bus_file)
+        return busio.read_binary_bus(self.bus_file, self.decode_seq)
 
     def iterate_cells(self):
         return iterate_cells_of_busfile(self.bus_file, is_binary=True)
 
 
 
-def iterate_cells_of_busfile(fname, is_binary=True):
+def iterate_cells_of_busfile(fname, is_binary=True, decode_seq=True):
     """
     runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
     and yield it as `cb,info_list`
     """
     if is_binary:
-        bus_iterator = busio.read_binary_bus(fname)
+        bus_iterator = busio.read_binary_bus(fname, decode_seq)
     else:
         bus_iterator = busio.read_text_bus(fname)
 
@@ -51,7 +55,7 @@ def iterate_cells_of_busfile(fname, is_binary=True):
     yield current_cell, current_info
 
 
-def iterate_bus_cells_pairs(fname1, fname2, is_binary=True):
+def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
     """
     busfiles must be sorted!!
 
@@ -62,8 +66,8 @@ def iterate_bus_cells_pairs(fname1, fname2, is_binary=True):
     - if cb1 > cb2 : advance the 2nd iterator (since cb1 is in the future of that 2nd iterator)
     - if cb2 > cb1 : advance the 1st iterator (since cb2 is in the future of that 1nd iterator)
     """
-    I1 = iterate_cells_of_busfile(fname1, is_binary)
-    I2 = iterate_cells_of_busfile(fname2, is_binary)
+    I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
+    I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)
 
     try:
         # get it started outside the loop

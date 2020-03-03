@@ -21,10 +21,17 @@ def _decode_int_to_ACGT(the_int, seq_len):
     return seq_str
 
 
-def read_binary_bus(fname):
+def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
     """
     iterating over a binary busfile,
     yielding (CB,UMI,EC,Counts,Flag)
+
+    decode_seq: CB/UMI are encoded as ints. decode them while going through the
+    file (takes considerable time, so if the actual sequence is not of interest,
+    dealing with the ints is alot faster)
+
+    buffersize: how many busrecords to load in a single IO operation. ~10 seems to be a
+    sweeyt spot, having decent speedups. increasing it more doesnt do much
     """
 
     with open(fname, 'rb') as fh:
@@ -54,14 +61,25 @@ def read_binary_bus(fname):
 
         but the iter(..., stop_element) is alot nicer
         """
-        for bus_entry in iter(partial(fh.read, 32), b''):
-            cb, umi, ec, count, flags, pad = struct.unpack('QQiIII', bus_entry)
-            assert pad == 0
-            cb_str = _decode_int_to_ACGT(cb, cb_len)
-            umi_str = _decode_int_to_ACGT(umi, umi_len)
 
-            record = Bus_record(CB=cb_str, UMI=umi_str, EC=ec, COUNT=count, FLAG=flags)
-            yield record
+        BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
+
+        def iterate_chunks(chunks):
+            # instead of loading one bus-record in an IO operation,
+            # we load a bunch of them and iterate over the individaul reacords later
+            for i in range(0, buffersize*BUS_ENTRY_SIZE, BUS_ENTRY_SIZE):
+                yield chunks[i:i+BUS_ENTRY_SIZE]
+
+        for bus_entry_chunk in iter(partial(fh.read, BUS_ENTRY_SIZE * buffersize), b''):
+            for bus_entry in iterate_chunks(bus_entry_chunk):
+                cb, umi, ec, count, flags, pad = struct.unpack('QQiIII', bus_entry)
+                assert pad == 0
+                if decode_seq:
+                    cb = _decode_int_to_ACGT(cb, cb_len)
+                    umi = _decode_int_to_ACGT(umi, umi_len)
+
+                record = Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
+                yield record
 
 
 def read_text_bus(fname):
