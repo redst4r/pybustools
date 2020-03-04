@@ -20,6 +20,39 @@ def _decode_int_to_ACGT(the_int, seq_len):
     seq_str = seq_decode_pad.replace('0', 'A').replace('1', 'C').replace('2', 'G').replace('3', 'T')
     return seq_str
 
+def batch(iterable, n):
+    """
+    breaking an iterable into chunks of size n
+    """
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
+
+def _iterate_busrecords_in_chunks(fh, n_chunks):
+    """
+    instead of loading one bus-record in an IO operation,
+    we load a bunch of them and iterate over the individaul reacords later
+    """
+    BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
+
+    """
+    the outer loop pulls 32bytes * N bytes out out the file, corresponding to N
+    different BUS-records
+    the inner loop goes over the individual single BUS-records
+    """
+
+    """
+    we could do a
+    while True:
+        bus = fh.read(32)
+        if bus == b'':
+            break
+
+    but the iter(..., stop_element) is alot nicer
+    """
+    for bus_entry_chunk in iter(partial(fh.read, BUS_ENTRY_SIZE * n_chunks), b''):
+        for bus_entry in batch(bus_entry_chunk, BUS_ENTRY_SIZE):
+            yield bus_entry
 
 def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
     """
@@ -41,7 +74,7 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
         # CB len
         # umi len
         # freetext header len
-        header = fh.read(20)
+        header = fh.read(20) # header is 20bytes
         magic, version, cb_len, umi_len, tlen = struct.unpack('4sIIII', header)
         assert magic == b'BUS\x00', "MAGIC doesnt match, wrong filetype??"
 
@@ -51,35 +84,16 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
         print(f'Bustools {version}, CB length {cb_len}, UMI length {umi_len}')
         print(f'Free header  {free_header}')
 
-        # read the bus entries
-        """
-        we could do a
-        while True:
-            bus = fh.read(32)
-            if bus == b'':
-                break
+        # read the bus entries and decode these bytes
+        for bus_entry in _iterate_busrecords_in_chunks(fh, n_chunks=buffersize):
+            cb, umi, ec, count, flags, pad = struct.unpack('QQiIII', bus_entry)
+            assert pad == 0
+            if decode_seq:
+                cb = _decode_int_to_ACGT(cb, cb_len)
+                umi = _decode_int_to_ACGT(umi, umi_len)
 
-        but the iter(..., stop_element) is alot nicer
-        """
-
-        BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
-
-        def iterate_chunks(chunks):
-            # instead of loading one bus-record in an IO operation,
-            # we load a bunch of them and iterate over the individaul reacords later
-            for i in range(0, buffersize*BUS_ENTRY_SIZE, BUS_ENTRY_SIZE):
-                yield chunks[i:i+BUS_ENTRY_SIZE]
-
-        for bus_entry_chunk in iter(partial(fh.read, BUS_ENTRY_SIZE * buffersize), b''):
-            for bus_entry in iterate_chunks(bus_entry_chunk):
-                cb, umi, ec, count, flags, pad = struct.unpack('QQiIII', bus_entry)
-                assert pad == 0
-                if decode_seq:
-                    cb = _decode_int_to_ACGT(cb, cb_len)
-                    umi = _decode_int_to_ACGT(umi, umi_len)
-
-                record = Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
-                yield record
+            record = Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
+            yield record
 
 
 def read_text_bus(fname):
