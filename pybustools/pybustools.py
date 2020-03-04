@@ -91,3 +91,66 @@ def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
     except StopIteration:
         print('One iterator finished!')
         return
+
+
+import toolz
+def iterate_bus_cells_multiple(names, fname_list, is_binary=True):
+    """
+    iterates over multiple busfiles, emitting an entries grouped by CB:
+    If a CB is present in multiple bus-files, this will yield:
+        cb, {n1: [umi, ...,
+                  umi ,...]
+             n2: [umi,....
+                  umi,....]
+        }
+    """
+
+    def minimum_str(str_list):
+        return toolz.reduce(lambda x,y: x if x < y else y, str_list)
+
+
+    # a dict of all the busfile-iterators
+    iterators = {n: iterate_cells_of_busfile(fname, is_binary) for n,fname in  zip(names, fname_list)}
+
+    # first elements:
+    elements = {}
+    for n, it in iterators.items():
+        cb, info = next(it)
+        elements[n] = (cb, info)
+    current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
+    current_min = minimum_str(current_cbs.values())
+
+
+    while len(iterators)>0:
+        #whichever iterators have the minimum value:
+        to_emit = []  # record the names of iterators that will emit an item
+        for n, cb in current_cbs.items():
+            if cb == current_min:
+                to_emit.append(n)
+
+        # emit all candidates,
+        emit_infos = {}
+        for candidate_name in to_emit:
+            cb, info = elements[candidate_name]
+            emit_infos[candidate_name] = info
+
+        yield current_min, emit_infos
+        # print(current_min, emit_infos)
+
+        #  advance their iterators
+        for candidate_name in to_emit:
+            try:
+                cb, info = next(iterators[candidate_name])
+                elements[candidate_name] = (cb, info)
+            except StopIteration:
+                del iterators[candidate_name]
+                del current_cbs[candidate_name]
+                del elements[candidate_name]
+
+        # new minimum!
+        current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
+        current_min = minimum_str(current_cbs.values())
+
+
+if __name__ == '__main__':
+    pass
