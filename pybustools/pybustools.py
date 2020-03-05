@@ -20,7 +20,7 @@ class Bus():
         return busio.read_binary_bus(self.bus_file, self.decode_seq)
 
     def iterate_cells(self):
-        return iterate_cells_of_busfile(self.bus_file, is_binary=True)
+        return iterate_cells_of_busfile(self.bus_file, is_binary=True, decode_seq=self.decode_seq)
 
 
 
