@@ -7,10 +7,11 @@ setup(name='pybustools',
       author='redst4r',
       maintainer='redst4r',
       maintainer_email='redst4r@web.de',
-      license='GNU GPL 3',
+      license='BSD 2-Clause License',
       keywords='RNAseq, kallisto, bustools',
       packages=['pybustools'],
       install_requires=[
-          'gmpy2'
+          'gmpy2',
+          'toolz'
           ],
       zip_safe=False)
