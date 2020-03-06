@@ -1,4 +1,5 @@
 # pybustools
+[![Build Status](https://travis-ci.org/redst4r/pybustools.svg?branch=master)](https://travis-ci.org/redst4r/pybustools)
 
 This is a python interface to the [bustools-format](https://github.com/BUStools/BUS-format) for single cell RNAseq usually produced using [kallisto-bustools](https://www.kallistobus.tools/).
 
