@@ -139,6 +139,24 @@ def read_transcripts(fname):
     return D
 
 
+
+def write_busfile(fname, bus_records:list, cb_length, umi_length):
+    with open(fname, 'wb') as fh:
+        fre_header = 'my_bus'
+        tlen = len(fre_header)
+        header_bytes = struct.pack('4sIIII', b'BUS\x00', 1, cb_length, umi_length, tlen)
+        free_header_bytes = struct.pack(f'{tlen}s', fre_header.encode())
+
+        fh.write(header_bytes)
+        fh.write(free_header_bytes)
+
+        for record in bus_records:
+
+            cb, umi, ec, count, flags = record
+            bytes_record = struct.pack('QQiIIxxxx', cb, umi, ec, count, flags)
+            fh.write(bytes_record)
+
+
 if __name__ == '__main__':
 
     ## some speedtest
