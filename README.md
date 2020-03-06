@@ -49,6 +49,5 @@ for record in B.iterate_bus():
 ``` 
 
 ## TODO
-- Unit-tests
 - parsing the binary format is slow; the bottleneck is `busio._decode_int_to_ACGT()` and `gmpy2.digits()` in there. This converts the int encoding into cDNA sequence
 - legacy code for reading plaintext-bus files

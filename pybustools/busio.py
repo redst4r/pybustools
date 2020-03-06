@@ -10,6 +10,8 @@ def _decode_int_to_ACGT(the_int, seq_len):
     bustools encodes sequences as integers, this function decodes the ints
     into their sequence
     """
+
+    assert the_int >= 0
     # the follwing line is a major performance HOG:
     # seq_decode = np.base_repr(the_int, 4) # seq_decode is a str: '10012031...'
     seq_decode = gmpy2.digits(the_int, 4)
@@ -17,6 +19,10 @@ def _decode_int_to_ACGT(the_int, seq_len):
     # the coding does not recognize leading 0 (adenines)
     # hence we pad 0 until we have the correct number of bases
     seq_decode_pad = seq_decode.zfill(seq_len)
+
+    assert len(seq_decode_pad) == seq_len, f'{len(seq_decode_pad)} vs {seq_len}'
+
+
     seq_str = seq_decode_pad.replace('0', 'A').replace('1', 'C').replace('2', 'G').replace('3', 'T')
     return seq_str
 
@@ -151,7 +157,6 @@ def write_busfile(fname, bus_records:list, cb_length, umi_length):
         fh.write(free_header_bytes)
 
         for record in bus_records:
-
             cb, umi, ec, count, flags = record
             bytes_record = struct.pack('QQiIIxxxx', cb, umi, ec, count, flags)
             fh.write(bytes_record)
