@@ -1,5 +1,6 @@
 from pybustools import busio
 import pathlib
+import toolz
 
 class Bus():
 
@@ -93,8 +94,7 @@ def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
         return
 
 
-import toolz
-def iterate_bus_cells_multiple(names, fname_list, is_binary=True):
+def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=True):
     """
     iterates over multiple busfiles, emitting an entries grouped by CB:
     If a CB is present in multiple bus-files, this will yield:
@@ -110,7 +110,7 @@ def iterate_bus_cells_multiple(names, fname_list, is_binary=True):
 
 
     # a dict of all the busfile-iterators
-    iterators = {n: iterate_cells_of_busfile(fname, is_binary) for n,fname in  zip(names, fname_list)}
+    iterators = {n: iterate_cells_of_busfile(fname, is_binary, decode_seq) for n,fname in  zip(names, fname_list)}
 
     # first elements:
     elements = {}
@@ -148,8 +148,11 @@ def iterate_bus_cells_multiple(names, fname_list, is_binary=True):
                 del elements[candidate_name]
 
         # new minimum!
-        current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
-        current_min = minimum_str(current_cbs.values())
+        if len(iterators)>0:
+            current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
+            current_min = minimum_str(current_cbs.values())
+        else:
+            break
 
 
 if __name__ == '__main__':
