@@ -3,6 +3,15 @@ from pybustools import busio
 import pathlib
 import os
 
+def test_encode():
+    assert busio._encode_ACGT_to_int('A') == 0
+    assert busio._encode_ACGT_to_int('AA') == 0
+
+    assert busio._encode_ACGT_to_int('GCCA') == 148
+
+    with pytest.raises(ValueError):
+        busio._encode_ACGT_to_int('B')
+
 def test_decode_int_to_ACGT():
 
     #  base order
@@ -32,6 +41,13 @@ def test_decode_int_to_ACGT():
     with pytest.raises(AssertionError):
         busio._decode_int_to_ACGT(-1,seq_len=1)
 
+def test_encode_decode():
+    i = 4723452
+    assert busio._encode_ACGT_to_int(busio._decode_int_to_ACGT(i, seq_len=13)) == i
+
+    seq = 'AAAATTTTGGGGCCCC'
+    assert busio._decode_int_to_ACGT(busio._encode_ACGT_to_int(seq), len(seq)) == seq
+
 def test_read_write(tmp_path):
 
     # records currenlty can only be written in int format!
@@ -60,6 +76,34 @@ def test_read_write(tmp_path):
     assert isinstance(record.CB, int) and isinstance(record.UMI, int)
     record = next(busio.read_binary_bus(fname, decode_seq=True, buffersize=2))
     assert isinstance(record.CB, str) and isinstance(record.UMI, str)
+
+def test_read_write_str(tmp_path):
+    """
+    write records with strings instead of ints for CB/UMI
+    """
+    records = [
+        busio.Bus_record('ATAT', 'GGG', 10, 20, 1),
+        busio.Bus_record('TTAT', 'AAA', 13, 206, 12),
+        busio.Bus_record('TAGA', 'TAT', 14, 250, 13)
+    ]
+    fname = tmp_path / 'some.bus'
+    busio.write_busfile(fname, records, cb_length=4, umi_length=3)
+    # read and compare to originl
+    new_records = list(busio.read_binary_bus(fname, decode_seq=True, buffersize=2))
+    assert new_records == records
+
+def test_write_check_cb_umi_length(tmp_path):
+    """
+    make sure an exception is thrown if the records dont match the given UMI/CB length
+    """
+    records = [
+        busio.Bus_record('ATAT', 'GGG', 10, 20, 1),
+        busio.Bus_record('TTA', 'AAA', 13, 206, 12),
+    ]
+    fname = tmp_path / 'some.bus'
+    with pytest.raises(AssertionError):
+        busio.write_busfile(fname, records, cb_length=4, umi_length=3)
+
 
 def test_batch():
     L = list(range(10))

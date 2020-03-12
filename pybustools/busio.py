@@ -5,6 +5,11 @@ import collections
 
 Bus_record = collections.namedtuple('BUSRecord', 'CB UMI EC COUNT FLAG')
 
+def _encode_ACGT_to_int(seq):
+    intstr = seq.replace('A', '0').replace('C', '1').replace('G', '2').replace('T', '3')
+    the_int = int(intstr, base=4)
+    return the_int
+
 def _decode_int_to_ACGT(the_int, seq_len):
     """
     bustools encodes sequences as integers, this function decodes the ints
@@ -147,6 +152,11 @@ def read_transcripts(fname):
 
 
 def write_busfile(fname, bus_records:list, cb_length, umi_length):
+    """
+    write bus_records to disk.
+    automatically checks if the CB/UMIs are given as ints or strings and encodes
+    them if needed
+    """
     with open(fname, 'wb') as fh:
         fre_header = 'my_bus'
         tlen = len(fre_header)
@@ -158,6 +168,18 @@ def write_busfile(fname, bus_records:list, cb_length, umi_length):
 
         for record in bus_records:
             cb, umi, ec, count, flags = record
+            # if the records have strings for CB/UMI, encode them into ints
+            if isinstance(cb, str) and isinstance(umi, str):
+                assert len(cb) == cb_length
+                assert len(umi) == umi_length
+                cb = _encode_ACGT_to_int(cb)
+                umi = _encode_ACGT_to_int(umi)
+            elif isinstance(cb, int) and isinstance(umi, int):
+                pass
+            else:
+                raise ValueError('CB/UMI must be both str or both int')
+
+
             bytes_record = struct.pack('QQiIIxxxx', cb, umi, ec, count, flags)
             fh.write(bytes_record)
 
