@@ -12,6 +12,7 @@ setup(name='pybustools',
       packages=['pybustools'],
       install_requires=[
           'gmpy2',
-          'toolz'
+          'toolz',
+          'tqdm'
           ],
       zip_safe=False)
