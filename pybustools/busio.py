@@ -5,10 +5,12 @@ import collections
 
 Bus_record = collections.namedtuple('BUSRecord', 'CB UMI EC COUNT FLAG')
 
+
 def _encode_ACGT_to_int(seq):
     intstr = seq.replace('A', '0').replace('C', '1').replace('G', '2').replace('T', '3')
     the_int = int(intstr, base=4)
     return the_int
+
 
 def _decode_int_to_ACGT(the_int, seq_len):
     """
@@ -27,9 +29,9 @@ def _decode_int_to_ACGT(the_int, seq_len):
 
     assert len(seq_decode_pad) == seq_len, f'{len(seq_decode_pad)} vs {seq_len}'
 
-
     seq_str = seq_decode_pad.replace('0', 'A').replace('1', 'C').replace('2', 'G').replace('3', 'T')
     return seq_str
+
 
 def batch(iterable, n):
     """
@@ -38,6 +40,7 @@ def batch(iterable, n):
     l = len(iterable)
     for ndx in range(0, l, n):
         yield iterable[ndx:min(ndx + n, l)]
+
 
 def _iterate_busrecords_in_chunks(fh, n_chunks):
     """
@@ -65,6 +68,7 @@ def _iterate_busrecords_in_chunks(fh, n_chunks):
         for bus_entry in batch(bus_entry_chunk, BUS_ENTRY_SIZE):
             yield bus_entry
 
+
 def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
     """
     iterating over a binary busfile,
@@ -85,7 +89,7 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
         # CB len
         # umi len
         # freetext header len
-        header = fh.read(20) # header is 20bytes
+        header = fh.read(20)  # header is 20bytes
         magic, version, cb_len, umi_len, tlen = struct.unpack('4sIIII', header)
         assert magic == b'BUS\x00', "MAGIC doesnt match, wrong filetype??"
 
@@ -150,7 +154,6 @@ def read_transcripts(fname):
     return D
 
 
-
 def write_busfile(fname, bus_records:list, cb_length, umi_length):
     """
     write bus_records to disk.
@@ -179,14 +182,13 @@ def write_busfile(fname, bus_records:list, cb_length, umi_length):
             else:
                 raise ValueError('CB/UMI must be both str or both int')
 
-
             bytes_record = struct.pack('QQiIIxxxx', cb, umi, ec, count, flags)
             fh.write(bytes_record)
 
 
 if __name__ == '__main__':
 
-    ## some speedtest
+    # some speedtest
     folder = '/run/media/michi/42506642-b470-4238-be14-bb0c303b3682/cruk/bustools_testing/E14B_mgi_bus_sorted'
     text_bus = f'{folder}/output.corrected.sort.txt.bus'
     bin_bus = f'{folder}/output.corrected.sort.bus'

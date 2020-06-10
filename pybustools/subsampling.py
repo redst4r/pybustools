@@ -2,22 +2,24 @@ import numpy as np
 from pybustools.busio import read_binary_bus, Bus_record, write_busfile
 import tqdm
 
+
 def get_number_of_reads_and_molecules(fname):
     """
     similar to bustools inspect
     Gets the number of reads and number of bus-records (approx #UMI) in a busfile
-    
-    :param fname: filename of the busfile 
+
+    :param fname: filename of the busfile
     """
     # TODO: technically not correct: this count the number of reads (fine) and number of ENTRIES in the busfile.
-    # ideally ach molecule would have a single entry. 
+    # ideally ach molecule would have a single entry.
     # However: a single molecule might map to two different EC classes. The molecule got fragmented into two places, mapping it to two diff locations
     total_reads = 0
     total_molecules = 0
     for record in tqdm.tqdm(read_binary_bus(fname, decode_seq=False), desc='counting reads'):
-        total_reads += record.COUNT    
+        total_reads += record.COUNT
         total_molecules += 1
     return total_reads, total_molecules
+
 
 def subsample_busfile(fname_in, fname_out, fraction):
     """
@@ -44,8 +46,9 @@ def subsample_busfile(fname_in, fname_out, fraction):
     huge_array = np.array(huge_array)
     n_total = np.sum(huge_array)
     n_target = int(n_total * fraction)
-
+    print(f'Subsampling from {n_total} to {n_target}')
     x = _downsample_array(huge_array, target=n_target, replace=False, inplace=False)
+    print(f'Downsampled reads: {x.sum()}')
 
     # create a generator for the bus-records
     def _helper_gen():

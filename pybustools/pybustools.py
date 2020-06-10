@@ -2,6 +2,7 @@ from pybustools import busio
 import pathlib
 import toolz
 
+
 class Bus():
 
     def __init__(self, folder,
@@ -13,7 +14,7 @@ class Bus():
         self.bus_file = self.folder / bus_name
         self.ec_file = self.folder / ec_name
         self.transcript_file = self.folder / transcript_name
-        self.decode_seq=decode_seq
+        self.decode_seq = decode_seq
         self.ec_dict = busio.read_matrix_ec(self.ec_file)
         self.transcript_dict = busio.read_transcripts(self.transcript_file)
 
@@ -22,7 +23,6 @@ class Bus():
 
     def iterate_cells(self):
         return iterate_cells_of_busfile(self.bus_file, is_binary=True, decode_seq=self.decode_seq)
-
 
 
 def iterate_cells_of_busfile(fname, is_binary=True, decode_seq=True):
@@ -106,11 +106,11 @@ def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=Tru
     """
 
     def minimum_str(str_list):
-        return toolz.reduce(lambda x,y: x if x < y else y, str_list)
-
+        return toolz.reduce(lambda x, y: x if x < y else y, str_list)
 
     # a dict of all the busfile-iterators
-    iterators = {n: iterate_cells_of_busfile(fname, is_binary, decode_seq) for n,fname in  zip(names, fname_list)}
+    iterators = {n: iterate_cells_of_busfile(fname, is_binary, decode_seq)
+                 for n, fname in zip(names, fname_list)}
 
     # first elements:
     elements = {}
@@ -120,9 +120,8 @@ def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=Tru
     current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
     current_min = minimum_str(current_cbs.values())
 
-
-    while len(iterators)>0:
-        #whichever iterators have the minimum value:
+    while len(iterators) > 0:
+        # whichever iterators have the minimum value:
         to_emit = []  # record the names of iterators that will emit an item
         for n, cb in current_cbs.items():
             if cb == current_min:
@@ -148,7 +147,7 @@ def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=Tru
                 del elements[candidate_name]
 
         # new minimum!
-        if len(iterators)>0:
+        if len(iterators) > 0:
             current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
             current_min = minimum_str(current_cbs.values())
         else:
