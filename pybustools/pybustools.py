@@ -56,6 +56,37 @@ def iterate_cells_of_busfile(fname, is_binary=True, decode_seq=True):
     yield current_cell, current_info
 
 
+def iterate_CB_UMI_of_busfile(fname, is_binary=True, decode_seq=True):
+    """
+    iterates over CB/UMI entries, i.e. all entries with the same CB/UMI
+    are emitted together.
+    ideally, there'd only be one entry per CB/UMI, but sometimes thers doublets
+    """
+    if is_binary:
+        bus_iterator = busio.read_binary_bus(fname, decode_seq)
+    else:
+        bus_iterator = busio.read_text_bus(fname)
+
+    cb, umi, ec, count, flag = next(bus_iterator)
+    current_cell = cb
+    current_umi = umi
+    current_info = [(ec, count, flag)]
+    for cb, umi, ec, count, flag in bus_iterator:
+        if cb != current_cell or umi != current_umi:
+            yield (current_cell, current_umi), current_info
+
+            # reset for the next cell/UMI
+            # process results and reset
+            current_cell = cb
+            current_umi = umi
+            current_info = [(ec, count, flag)]
+
+        else:
+            current_info.append((ec, count, flag))
+
+    yield (current_cell, current_umi), current_info
+
+
 def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
     """
     busfiles must be sorted!!
@@ -92,6 +123,94 @@ def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
     except StopIteration:
         print('One iterator finished!')
         return
+
+
+def iterate_bus_cells_pairs_basic(fname1, fname2, is_binary=True, decode_seq=True):
+    """
+    opposed to iterate_bus_cells_pairs, this yields an entry for each CB
+    (wether its in both or only a single file).
+    If the CB is not present in the other file, it'll yield `None`
+    """
+    I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
+    I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)
+
+    try:
+        # get it started outside the loop
+        cb1, info1 = next(I1)
+        cb2, info2 = next(I2)
+        while True:
+            if cb1 == cb2:
+                yield cb1, info1, info2
+                # advancing both iterators
+                cb1, info1 = next(I1)
+                cb2, info2 = next(I2)
+            elif cb1 > cb2:
+                yield cb2, None, info2
+                # get the next cell in I2
+                cb2, info2 = next(I2)
+            elif cb2 > cb1:
+                yield cb1, info1, None
+                cb1, info1 = next(I1)
+            else:
+                raise ValueError('cant happen')
+    # the next() will throw an exception if one generator runs out
+    # thats the signal that we're done with the pairs
+    except StopIteration:
+        print('One iterator finished!')
+        return
+
+
+def iterate_bus_cells_umi_multiple(names, fname_list, is_binary=True, decode_seq=True):
+
+    def minimum_str(str_list):
+        return toolz.reduce(lambda x, y: x if x < y else y, str_list)
+
+    # a dict of all the busfile-iterators
+    iterators = {n: iterate_CB_UMI_of_busfile(fname, is_binary, decode_seq)
+                 for n, fname in zip(names, fname_list)}
+
+    # the CB/UMI iterator will yield tuples of CB,UMI
+    # luckily python does the righth thing for tuple comparison, i.e. > < work
+
+    # first elements:
+    elements = {}
+    for n, it in iterators.items():
+        cb_umi, info = next(it)
+        elements[n] = (cb_umi, info)
+    current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
+    current_min = minimum_str(current_cbs.values())  # the smallest CB/UMI tuple
+
+    while len(iterators) > 0:
+        # whichever iterators have the minimum value:
+        to_emit = []  # record the names of iterators that will emit an item
+        for n, cb_umi in current_cbs.items():
+            if cb_umi == current_min:
+                to_emit.append(n)
+
+        # emit all candidates,
+        emit_infos = {}
+        for candidate_name in to_emit:
+            cb_umi, info = elements[candidate_name]
+            emit_infos[candidate_name] = info
+
+        yield current_min, emit_infos
+
+        #  advance their iterators
+        for candidate_name in to_emit:
+            try:
+                cb_umi, info = next(iterators[candidate_name])
+                elements[candidate_name] = (cb_umi, info)
+            except StopIteration:
+                del iterators[candidate_name]
+                del current_cbs[candidate_name]
+                del elements[candidate_name]
+
+        # new minimum!
+        if len(iterators) > 0:
+            current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
+            current_min = minimum_str(current_cbs.values())
+        else:
+            break
 
 
 def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=True):
