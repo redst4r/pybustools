@@ -69,7 +69,7 @@ def _iterate_busrecords_in_chunks(fh, n_chunks):
             yield bus_entry
 
 
-def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
+def read_binary_bus(fname, decode_seq:bool=True, buffersize=500):
     """
     iterating over a binary busfile,
     yielding (CB,UMI,EC,Counts,Flag)
@@ -100,8 +100,9 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=10):
         print(f'Free header  {free_header}')
 
         # read the bus entries and decode these bytes
+        unpack_str = 'QQiIII'
         for bus_entry in _iterate_busrecords_in_chunks(fh, n_chunks=buffersize):
-            cb, umi, ec, count, flags, pad = struct.unpack('QQiIII', bus_entry)
+            cb, umi, ec, count, flags, pad = struct.unpack(unpack_str, bus_entry)
             assert pad == 0
             if decode_seq:
                 cb = _decode_int_to_ACGT(cb, cb_len)
