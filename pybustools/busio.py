@@ -1,8 +1,7 @@
 import struct
-from functools import partial
 import gmpy2
 import collections
-
+from functools import partial
 Bus_record = collections.namedtuple('BUSRecord', 'CB UMI EC COUNT FLAG')
 
 
@@ -33,52 +32,15 @@ def _decode_int_to_ACGT(the_int, seq_len):
     return seq_str
 
 
-def batch(iterable, n):
+def read_binary_bus(fname, decode_seq:bool=True, buffersize=1000):
     """
-    breaking an iterable into chunks of size n
-    """
-    l = len(iterable)
-    for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
-
-
-def _iterate_busrecords_in_chunks(fh, n_chunks):
-    """
-    instead of loading one bus-record in an IO operation,
-    we load a bunch of them and iterate over the individaul reacords later
-    """
-    BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
-
-    """
-    the outer loop pulls 32bytes * N bytes out out the file, corresponding to N
-    different BUS-records
-    the inner loop goes over the individual single BUS-records
-    """
-
-    """
-    we could do a
-    while True:
-        bus = fh.read(32)
-        if bus == b'':
-            break
-
-    but the iter(..., stop_element) is alot nicer
-    """
-    for bus_entry_chunk in iter(partial(fh.read, BUS_ENTRY_SIZE * n_chunks), b''):
-        for bus_entry in batch(bus_entry_chunk, BUS_ENTRY_SIZE):
-            yield bus_entry
-
-
-def read_binary_bus(fname, decode_seq:bool=True, buffersize=500):
-    """
-    iterating over a binary busfile,
-    yielding (CB,UMI,EC,Counts,Flag)
+    iterating over a binary busfile, yielding (CB,UMI,EC,Counts,Flag)
 
     decode_seq: CB/UMI are encoded as ints. decode them while going through the
     file (takes considerable time, so if the actual sequence is not of interest,
     dealing with the ints is alot faster)
 
-    buffersize: how many busrecords to load in a single IO operation. ~10 seems to be a
+    buffersize: how many busrecords to load in a single IO operation. ~1000 seems to be a
     sweeyt spot, having decent speedups. increasing it more doesnt do much
     """
 
@@ -99,32 +61,19 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=500):
         print(f'Bustools {version}, CB length {cb_len}, UMI length {umi_len}')
         print(f'Free header  {free_header}')
 
-        # read the bus entries and decode these bytes
+        BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
         unpack_str = 'QQiIII'
-        for bus_entry in _iterate_busrecords_in_chunks(fh, n_chunks=buffersize):
-            cb, umi, ec, count, flags, pad = struct.unpack(unpack_str, bus_entry)
-            assert pad == 0
-            if decode_seq:
-                cb = _decode_int_to_ACGT(cb, cb_len)
-                umi = _decode_int_to_ACGT(umi, umi_len)
+        for bus_chunk in iter(partial(fh.read, BUS_ENTRY_SIZE * buffersize), b''):
+            # iterate over each single entry in the loaded chunk.
+            # mote that struct.iter_unpack neatly turns the chunk into an
+            # iterator
+            for cb, umi, ec, count, flags, pad in struct.iter_unpack(unpack_str, bus_chunk):
+                assert pad == 0
+                if decode_seq:
+                    cb = _decode_int_to_ACGT(cb, cb_len)
+                    umi = _decode_int_to_ACGT(umi, umi_len)
 
-            record = Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
-            yield record
-
-
-def read_text_bus(fname):
-    """
-    iterating over a plaintext busfile,
-    yielding CB/UMI/EC/Counts/Flag
-    """
-    with open(fname, 'r') as fh:
-        for line in fh:
-            cb, umi, ec, count = line.split()
-            ec = int(ec)
-            count = int(count)
-            flag = 0  # TODO Flag fixed!!
-            record = Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flag)
-            yield record
+                yield Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
 
 
 def read_matrix_ec(fname):
@@ -188,18 +137,9 @@ def write_busfile(fname, bus_records:list, cb_length, umi_length):
 
 
 if __name__ == '__main__':
-
-    # some speedtest
-    folder = '/run/media/michi/42506642-b470-4238-be14-bb0c303b3682/cruk/bustools_testing/E14B_mgi_bus_sorted'
-    text_bus = f'{folder}/output.corrected.sort.txt.bus'
-    bin_bus = f'{folder}/output.corrected.sort.bus'
-
-    I_plain = read_text_bus(text_bus)
-    I_bin = read_binary_bus(bin_bus)
-
     import tqdm
-    for _ in tqdm.tqdm(I_plain):
-        pass
-
+    folder = '/run/media/michi/42506642-b470-4238-be14-bb0c303b3682/cruk/bustools_testing/E14B_mgi_bus_sorted'
+    bin_bus = f'{folder}/output.corrected.sort.bus'
+    I_bin = read_binary_bus(bin_bus)
     for _ in tqdm.tqdm(I_bin):
         pass
