@@ -20,7 +20,7 @@ from pybustools.pybustools import Bus
 
 B = Bus(folder='/path/to/bus/output', bus_name='sorted.bus')
 
-# iterate the records one by one; it yields namedtuples 
+# iterate the records one by one; it yields namedtuples
 for record in B.iterate_bus():
     record.CB, record.UMI, record.EC, record.COUNT, record.FLAG  # str, str, int int, int
 
@@ -38,16 +38,33 @@ for cb, umi_list  in B.iterate_cells():
 ```
 
 ## Some tricks for speed
-The bus-format encodes sequences (CB/UMI) as ints (from the docs: ... the barcode `GCCA` corresponds to the bit code `10010100` or the integer `148`). 
+The bus-format encodes sequences (CB/UMI) as ints (from the docs: ... the barcode `GCCA` corresponds to the bit code `10010100` or the integer `148`).
 Decoding these into sequences is currently a performance bottleneck (done via `gmpy2.digits()` atm, which is already a pretty fast C-implementation).
-If you dont care about actual sequence, you can turn of the decoding step and iterating over the bus records will return ints for CB/UMI:
+If you don't care about actual sequence, you can turn of the decoding step and iterating over the bus records will return ints for CB/UMI:
 
 ```python
 B = Bus(folder='/path/to/bus/output', decode_seq=False)
 for record in B.iterate_bus():
-    print(record.CB, record.UMI)  # these will be python ints now instead of str 
-``` 
+    print(record.CB, record.UMI)  # these will be python ints now instead of str
+```
+
+## Notes
+### Multiple bus records for the same CB/UMI
+Ideally there's only as single bus record for each molecule (CB/UMI).
+However, occasionally, one finds multiple bus records with the same CB/UMI but different ECs.
+
+Here's how that can happen:
+1. A molecule (a specific mRNA) gets amplified. Some cDNAs of the molecule are longer, others shorter (PCR terminated early)
+2. Sequencing these different cDNAs from the same molecule yields different reads.
+3. These reads can map to different ECs.
+```
+exons:  -----Exon1-----|----Exon2------
+mRNA:   --------------------------------
+cDNA1:  -------------                <-  EC: {E1}
+cDNA2:  ------------------------     <-  EC: {E1,E2}
+```
+4. Presumably, it can also map to a completely different region, due to sequencing/PCR errors!?
+
 
 ## TODO
 - parsing the binary format is slow; the bottleneck is `busio._decode_int_to_ACGT()` and `gmpy2.digits()` in there. This converts the int encoding into cDNA sequence
-- legacy code for reading plaintext-bus files

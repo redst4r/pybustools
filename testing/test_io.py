@@ -3,6 +3,7 @@ from pybustools import busio
 import pathlib
 import os
 
+
 def test_encode():
     assert busio._encode_ACGT_to_int('A') == 0
     assert busio._encode_ACGT_to_int('AA') == 0
@@ -11,6 +12,7 @@ def test_encode():
 
     with pytest.raises(ValueError):
         busio._encode_ACGT_to_int('B')
+
 
 def test_decode_int_to_ACGT():
 
@@ -41,6 +43,7 @@ def test_decode_int_to_ACGT():
     with pytest.raises(AssertionError):
         busio._decode_int_to_ACGT(-1,seq_len=1)
 
+
 def test_encode_decode():
     i = 4723452
     assert busio._encode_ACGT_to_int(busio._decode_int_to_ACGT(i, seq_len=13)) == i
@@ -48,9 +51,9 @@ def test_encode_decode():
     seq = 'AAAATTTTGGGGCCCC'
     assert busio._decode_int_to_ACGT(busio._encode_ACGT_to_int(seq), len(seq)) == seq
 
+
 def test_read_write(tmp_path):
 
-    # records currenlty can only be written in int format!
     records = [
         busio.Bus_record(0, 0, 10, 20, 1),
         busio.Bus_record(1, 0, 13, 206, 12),
@@ -77,6 +80,7 @@ def test_read_write(tmp_path):
     record = next(busio.read_binary_bus(fname, decode_seq=True, buffersize=2))
     assert isinstance(record.CB, str) and isinstance(record.UMI, str)
 
+
 def test_read_write_str(tmp_path):
     """
     write records with strings instead of ints for CB/UMI
@@ -91,6 +95,7 @@ def test_read_write_str(tmp_path):
     # read and compare to originl
     new_records = list(busio.read_binary_bus(fname, decode_seq=True, buffersize=2))
     assert new_records == records
+
 
 def test_write_check_cb_umi_length(tmp_path):
     """
@@ -126,6 +131,7 @@ def ec_matrix_file():
     yield fname
     os.remove(fname)
 
+
 @pytest.fixture
 def transcript_file():
     "creates an transcript_file with 10 entries"
@@ -142,6 +148,7 @@ def test_read_matrix_ec(ec_matrix_file):
     ec_dict = busio.read_matrix_ec(ec_matrix_file)
     assert len(ec_dict) == 10
     assert ec_dict[0] == [1,2,3,4]
+
 
 def test_read_transcripts(transcript_file):
     t_dict = busio.read_transcripts(transcript_file)
