@@ -1,4 +1,4 @@
-from pybustools import busio
+from pybustools import busio, busio_old
 import pathlib
 import toolz
 
@@ -65,7 +65,7 @@ def iterate_CB_UMI_of_busfile(fname, is_binary=True, decode_seq=True):
     if is_binary:
         bus_iterator = busio.read_binary_bus(fname, decode_seq)
     else:
-        bus_iterator = busio.read_text_bus(fname)
+        bus_iterator = busio_old.read_text_bus(fname)
 
     cb, umi, ec, count, flag = next(bus_iterator)
     current_cell = cb
@@ -130,6 +130,9 @@ def iterate_bus_cells_pairs_basic(fname1, fname2, is_binary=True, decode_seq=Tru
     opposed to iterate_bus_cells_pairs, this yields an entry for each CB
     (wether its in both or only a single file).
     If the CB is not present in the other file, it'll yield `None`
+
+
+    WARNING: this skipps the last elements if one iterator finishes
     """
     I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
     I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)

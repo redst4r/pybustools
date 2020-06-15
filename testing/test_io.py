@@ -1,5 +1,5 @@
 import pytest
-from pybustools import busio
+from pybustools import busio, busio_old
 import pathlib
 import os
 
@@ -112,7 +112,7 @@ def test_write_check_cb_umi_length(tmp_path):
 
 def test_batch():
     L = list(range(10))
-    B = busio.batch(L, n=4)
+    B = busio_old.batch(L, n=4)
 
     result = []
     for b in B:
