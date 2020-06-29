@@ -32,6 +32,32 @@ def _decode_int_to_ACGT(the_int, seq_len):
     return seq_str
 
 
+
+def get_header_info(fname):
+    """
+    retrieve the bus header info (version, CB/UMI length, and the freeform header)
+    """
+    with open(fname, 'rb') as fh:
+        header = fh.read(20)  # header is 20bytes
+        version, cb_len, umi_len, tlen = parse_header_info(header)
+
+    return version, cb_len, umi_len, tlen
+
+    
+def parse_header_info(header_bytes):
+    # read the header
+    # Magic (4bytes)
+    # version int
+    # CB len
+    # umi len
+    # freetext header len
+    assert len(header_bytes) == 20
+    magic, version, cb_len, umi_len, tlen = struct.unpack('4sIIII', header_bytes)
+    assert magic == b'BUS\x00', "MAGIC doesnt match, wrong filetype??"
+
+    return version, cb_len, umi_len, tlen
+    
+
 def read_binary_bus(fname, decode_seq:bool=True, buffersize=1000):
     """
     iterating over a binary busfile, yielding (CB,UMI,EC,Counts,Flag)
@@ -45,19 +71,12 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=1000):
     """
 
     with open(fname, 'rb') as fh:
-        # read the header
-        # Magic (4bytes)
-        # version int
-        # CB len
-        # umi len
-        # freetext header len
         header = fh.read(20)  # header is 20bytes
-        magic, version, cb_len, umi_len, tlen = struct.unpack('4sIIII', header)
-        assert magic == b'BUS\x00', "MAGIC doesnt match, wrong filetype??"
-
+        
+        version, cb_len, umi_len, tlen = parse_header_info(header)
         # read the free header
         free_header = struct.unpack(f'{tlen}s', fh.read(tlen))
-
+        
         print(f'Bustools {version}, CB length {cb_len}, UMI length {umi_len}')
         print(f'Free header  {free_header}')
 

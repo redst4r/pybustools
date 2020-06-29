@@ -1,5 +1,5 @@
 import numpy as np
-from pybustools.busio import read_binary_bus, Bus_record, write_busfile
+from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_header_info
 import tqdm
 
 
@@ -59,7 +59,11 @@ def subsample_busfile(fname_in, fname_out, fraction):
                 yield r
 
     G = _helper_gen()
-    write_busfile(fname_out, G, cb_length=16, umi_length=10)
+    
+    # we need to write the correct header
+    _, cb_len, umi_len, _ = get_header_info(fname_in)
+    
+    write_busfile(fname_out, G, cb_length=cb_len, umi_length=umi_len)
 
 
 def _downsample_array(

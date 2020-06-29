@@ -51,7 +51,19 @@ def test_encode_decode():
     seq = 'AAAATTTTGGGGCCCC'
     assert busio._decode_int_to_ACGT(busio._encode_ACGT_to_int(seq), len(seq)) == seq
 
+def test_get_header(tmp_path):
 
+    records = [
+        busio.Bus_record(0, 0, 10, 20, 1),
+        busio.Bus_record(1, 0, 13, 206, 12),
+        busio.Bus_record(2, 0, 14, 250, 13)
+    ]
+    fname = tmp_path / 'some.bus'
+    busio.write_busfile(fname, records, cb_length=12, umi_length=5)
+    
+    _ ,cb, umi, _ = busio.get_header_info(fname)
+    assert cb == 12 and umi==5
+    
 def test_read_write(tmp_path):
 
     records = [
