@@ -25,15 +25,12 @@ class Bus():
         return iterate_cells_of_busfile(self.bus_file, is_binary=True, decode_seq=self.decode_seq)
 
 
-def iterate_cells_of_busfile(fname, is_binary=True, decode_seq=True):
+def iterate_cells_of_busfile(fname, decode_seq=True):
     """
     runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
     and yield it as `cb,info_list`
     """
-    if is_binary:
-        bus_iterator = busio.read_binary_bus(fname, decode_seq)
-    else:
-        bus_iterator = busio.read_text_bus(fname)
+    bus_iterator = busio.read_binary_bus(fname, decode_seq)
 
     # get the first entry to get started
     cb, umi, ec, count, flag = next(bus_iterator)
@@ -56,16 +53,13 @@ def iterate_cells_of_busfile(fname, is_binary=True, decode_seq=True):
     yield current_cell, current_info
 
 
-def iterate_CB_UMI_of_busfile(fname, is_binary=True, decode_seq=True):
+def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
     """
     iterates over CB/UMI entries, i.e. all entries with the same CB/UMI
     are emitted together.
     ideally, there'd only be one entry per CB/UMI, but sometimes thers doublets
     """
-    if is_binary:
-        bus_iterator = busio.read_binary_bus(fname, decode_seq)
-    else:
-        bus_iterator = busio_old.read_text_bus(fname)
+    bus_iterator = busio.read_binary_bus(fname, decode_seq)
 
     cb, umi, ec, count, flag = next(bus_iterator)
     current_cell = cb
@@ -87,80 +81,80 @@ def iterate_CB_UMI_of_busfile(fname, is_binary=True, decode_seq=True):
     yield (current_cell, current_umi), current_info
 
 
-def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
-    """
-    busfiles must be sorted!!
+# def iterate_bus_cells_pairs(fname1, fname2, is_binary=True, decode_seq=True):
+#     """
+#     busfiles must be sorted!!
 
-    iterate over the files until we have a matchign pair of cells
-    collect the info on both cells and advance to the next pair
+#     iterate over the files until we have a matchign pair of cells
+#     collect the info on both cells and advance to the next pair
 
-    the pairing is tricky, given two CBs cb1, cb2:
-    - if cb1 > cb2 : advance the 2nd iterator (since cb1 is in the future of that 2nd iterator)
-    - if cb2 > cb1 : advance the 1st iterator (since cb2 is in the future of that 1nd iterator)
-    """
-    I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
-    I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)
+#     the pairing is tricky, given two CBs cb1, cb2:
+#     - if cb1 > cb2 : advance the 2nd iterator (since cb1 is in the future of that 2nd iterator)
+#     - if cb2 > cb1 : advance the 1st iterator (since cb2 is in the future of that 1nd iterator)
+#     """
+#     I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
+#     I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)
 
-    try:
-        # get it started outside the loop
-        cb1, info1 = next(I1)
-        cb2, info2 = next(I2)
-        while True:
-            if cb1 == cb2:
-                yield cb1, info1, info2
-                # advancing both iterators
-                cb1, info1 = next(I1)
-                cb2, info2 = next(I2)
-            elif cb1 > cb2:
-                # get the next cell in I2
-                cb2, info2 = next(I2)
-            elif cb2 > cb1:
-                cb1, info1 = next(I1)
-            else:
-                raise ValueError('cant happen')
-    # the next() will throw an exception if one generator runs out
-    # thats the signal that we're done with the pairs
-    except StopIteration:
-        print('One iterator finished!')
-        return
-
-
-def iterate_bus_cells_pairs_basic(fname1, fname2, is_binary=True, decode_seq=True):
-    """
-    opposed to iterate_bus_cells_pairs, this yields an entry for each CB
-    (wether its in both or only a single file).
-    If the CB is not present in the other file, it'll yield `None`
+#     try:
+#         # get it started outside the loop
+#         cb1, info1 = next(I1)
+#         cb2, info2 = next(I2)
+#         while True:
+#             if cb1 == cb2:
+#                 yield cb1, info1, info2
+#                 # advancing both iterators
+#                 cb1, info1 = next(I1)
+#                 cb2, info2 = next(I2)
+#             elif cb1 > cb2:
+#                 # get the next cell in I2
+#                 cb2, info2 = next(I2)
+#             elif cb2 > cb1:
+#                 cb1, info1 = next(I1)
+#             else:
+#                 raise ValueError('cant happen')
+#     # the next() will throw an exception if one generator runs out
+#     # thats the signal that we're done with the pairs
+#     except StopIteration:
+#         print('One iterator finished!')
+#         return
 
 
-    WARNING: this skipps the last elements if one iterator finishes
-    """
-    I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
-    I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)
+# def iterate_bus_cells_pairs_basic(fname1, fname2, is_binary=True, decode_seq=True):
+#     """
+#     opposed to iterate_bus_cells_pairs, this yields an entry for each CB
+#     (wether its in both or only a single file).
+#     If the CB is not present in the other file, it'll yield `None`
 
-    try:
-        # get it started outside the loop
-        cb1, info1 = next(I1)
-        cb2, info2 = next(I2)
-        while True:
-            if cb1 == cb2:
-                yield cb1, info1, info2
-                # advancing both iterators
-                cb1, info1 = next(I1)
-                cb2, info2 = next(I2)
-            elif cb1 > cb2:
-                yield cb2, None, info2
-                # get the next cell in I2
-                cb2, info2 = next(I2)
-            elif cb2 > cb1:
-                yield cb1, info1, None
-                cb1, info1 = next(I1)
-            else:
-                raise ValueError('cant happen')
-    # the next() will throw an exception if one generator runs out
-    # thats the signal that we're done with the pairs
-    except StopIteration:
-        print('One iterator finished!')
-        return
+
+#     WARNING: this skipps the last elements if one iterator finishes
+#     """
+#     I1 = iterate_cells_of_busfile(fname1, is_binary, decode_seq)
+#     I2 = iterate_cells_of_busfile(fname2, is_binary, decode_seq)
+
+#     try:
+#         # get it started outside the loop
+#         cb1, info1 = next(I1)
+#         cb2, info2 = next(I2)
+#         while True:
+#             if cb1 == cb2:
+#                 yield cb1, info1, info2
+#                 # advancing both iterators
+#                 cb1, info1 = next(I1)
+#                 cb2, info2 = next(I2)
+#             elif cb1 > cb2:
+#                 yield cb2, None, info2
+#                 # get the next cell in I2
+#                 cb2, info2 = next(I2)
+#             elif cb2 > cb1:
+#                 yield cb1, info1, None
+#                 cb1, info1 = next(I1)
+#             else:
+#                 raise ValueError('cant happen')
+#     # the next() will throw an exception if one generator runs out
+#     # thats the signal that we're done with the pairs
+#     except StopIteration:
+#         print('One iterator finished!')
+#         return
 
 
 def iterate_bus_cells_umi_multiple(names, fname_list, is_binary=True, decode_seq=True):
