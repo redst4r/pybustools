@@ -1,6 +1,8 @@
 import numpy as np
 from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_header_info
 import tqdm
+import os
+import shutil
 
 
 def get_number_of_reads_and_molecules(fname):
@@ -59,10 +61,8 @@ def subsample_busfile(fname_in, fname_out, fraction):
                 yield r
 
     G = _helper_gen()
-    
     # we need to write the correct header
     _, cb_len, umi_len, _ = get_header_info(fname_in)
-    
     write_busfile(fname_out, G, cb_length=cb_len, umi_length=umi_len)
 
 
@@ -94,3 +94,29 @@ def _downsample_array(
             geneptr += 1
         col[geneptr] += 1
     return col
+
+
+def subsample_kallisto_bus(busdir, outdir, fraction):
+    """
+    not only subsamples the .bus file, but also sets up a folder that looks like a original kallisto quantification
+    so that `bustools count` can be run on it
+    
+    :param busdir: directory containing the bustools quantification (if nextflow: .../kallisto/sort_bus/bus_output). 
+                   must contain `output.corrected.sort.bus`, `matrix.ec`, `transcripts.txt`
+                   
+    :param outdir: must exist. puts the downsampled kallisto .bus and suppl.files here
+    :param fraction: 0<fraction<1: fraction of reads to sample
+    
+    """
+    assert os.path.exists(outdir)
+    infile = f'{busdir}/output.corrected.sort.bus'
+    outfile = f'{outdir}/output.corrected.sort.bus'
+
+    subsample_busfile(infile, outfile, fraction=fraction)
+        
+    # copy the other parts of the kallisto output, they remain unchanged
+    ec = f'{busdir}/matrix.ec'
+    transcripts = f'{busdir}/transcripts.txt'
+    
+    shutil.copy(ec, outdir)
+    shutil.copy(transcripts, outdir)  
