@@ -115,7 +115,7 @@ class ParallelCellGenerator(ParallelGenerator):
         # connect the queues to the files
         # this will start a process for each file, populating the queue
         for name, fname in self.busfile_dict.items():
-            task = mp.Pool(1, initializer=cell_producer, initargs=(fname, self.queues[name], True, self.decode_seq))
+            task = mp.Pool(1, initializer=cell_producer, initargs=(fname, self.queues[name], self.decode_seq))
             self.tasks[name] = task
 
 
@@ -129,15 +129,15 @@ class ParallelCellUMIGenerator(ParallelGenerator):
         # connect the queues to the files
         # this will start a process for each file, populating the queue
         for name, fname in self.busfile_dict.items():
-            task = mp.Pool(1, initializer=cell_umi_producer, initargs=(fname, self.queues[name], True, self.decode_seq))
+            task = mp.Pool(1, initializer=cell_umi_producer, initargs=(fname, self.queues[name], self.decode_seq))
             self.tasks[name] = task
 
 
-def cell_producer(fname, out_queue, is_binary, decode_seq):
+def cell_producer(fname, out_queue, decode_seq):
     """
     turns iterate_cells_of_busfile into a queue
     """
-    for record in iterate_cells_of_busfile(fname, is_binary, decode_seq):
+    for record in iterate_cells_of_busfile(fname, decode_seq):
         # print('Putting record:', fname, record[0])
         out_queue.put(record)
         # print('sleeping')
@@ -145,11 +145,11 @@ def cell_producer(fname, out_queue, is_binary, decode_seq):
     out_queue.put(TERMINATOR)
 
 
-def cell_umi_producer(fname, out_queue, is_binary, decode_seq):
+def cell_umi_producer(fname, out_queue, decode_seq):
     """
     turns iterate_CB_UMI_of_busfile into a queue
     """
-    for record in iterate_CB_UMI_of_busfile(fname, is_binary, decode_seq):
+    for record in iterate_CB_UMI_of_busfile(fname, decode_seq):
         # print('Putting record:', fname, record[0])
         out_queue.put(record)
         # print('sleeping')
@@ -168,7 +168,7 @@ def _helper_queue_iterator(queue):
         return result
 
 
-def parallel_iterate_bus_cells_pairs_basic(fname1, fname2, is_binary=True, decode_seq=True):
+def parallel_iterate_bus_cells_pairs_basic(fname1, fname2, decode_seq=True):
     """
     opposed to iterate_bus_cells_pairs, this yields an entry for each CB
     (wether its in both or only a single file).
@@ -179,8 +179,8 @@ def parallel_iterate_bus_cells_pairs_basic(fname1, fname2, is_binary=True, decod
     queue1 = mp.Queue(QUEUE_LENGTH)
     queue2 = mp.Queue(QUEUE_LENGTH)
 
-    task1 = mp.Pool(1, initializer=cell_producer, initargs=(fname1, queue1, True, True))
-    task2 = mp.Pool(1, initializer=cell_producer, initargs=(fname2, queue2, True, True))
+    task1 = mp.Pool(1, initializer=cell_producer, initargs=(fname1, queue1, True))
+    task2 = mp.Pool(1, initializer=cell_producer, initargs=(fname2, queue2, True))
 
     try:
         # get it started outside the loop

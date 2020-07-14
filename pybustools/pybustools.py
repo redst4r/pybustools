@@ -22,7 +22,7 @@ class Bus():
         return busio.read_binary_bus(self.bus_file, self.decode_seq)
 
     def iterate_cells(self):
-        return iterate_cells_of_busfile(self.bus_file, is_binary=True, decode_seq=self.decode_seq)
+        return iterate_cells_of_busfile(self.bus_file, decode_seq=self.decode_seq)
 
 
 def iterate_cells_of_busfile(fname, decode_seq=True):
@@ -157,13 +157,13 @@ def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
 #         return
 
 
-def iterate_bus_cells_umi_multiple(names, fname_list, is_binary=True, decode_seq=True):
+def iterate_bus_cells_umi_multiple(names, fname_list, decode_seq=True):
 
     def minimum_str(str_list):
         return toolz.reduce(lambda x, y: x if x < y else y, str_list)
 
     # a dict of all the busfile-iterators
-    iterators = {n: iterate_CB_UMI_of_busfile(fname, is_binary, decode_seq)
+    iterators = {n: iterate_CB_UMI_of_busfile(fname, decode_seq)
                  for n, fname in zip(names, fname_list)}
 
     # the CB/UMI iterator will yield tuples of CB,UMI
@@ -210,7 +210,7 @@ def iterate_bus_cells_umi_multiple(names, fname_list, is_binary=True, decode_seq
             break
 
 
-def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=True):
+def iterate_bus_cells_multiple(names, fname_list, decode_seq=True):
     """
     iterates over multiple busfiles, emitting an entries grouped by CB:
     If a CB is present in multiple bus-files, this will yield:
@@ -225,7 +225,7 @@ def iterate_bus_cells_multiple(names, fname_list, is_binary=True, decode_seq=Tru
         return toolz.reduce(lambda x, y: x if x < y else y, str_list)
 
     # a dict of all the busfile-iterators
-    iterators = {n: iterate_cells_of_busfile(fname, is_binary, decode_seq)
+    iterators = {n: iterate_cells_of_busfile(fname, decode_seq)
                  for n, fname in zip(names, fname_list)}
 
     # first elements:
