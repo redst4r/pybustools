@@ -156,6 +156,68 @@ def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
 #         print('One iterator finished!')
 #         return
 
+def merge_iterators(dict_of_iterators):
+    """
+    given a dictionary  iname->Iterator
+    where each iterator yields a key,value pair,
+    this function aggregates items across iterators that have the same key
+    {
+        I1 : ['A': 1, 'B':2, 'C':3]
+        I2 : ['A': 10, 'B':20, 'D':30]
+    }
+
+    will become:
+    'A': {I1: 1, I2:10},
+    'B': {I1: 2, I2:20}
+    'C': {I1: 3}
+    'D': {I2: 30}
+
+    This assumes the ITERATORS ARE KEY SORTED!!!
+    Keys also must be strings
+    """
+    def minimum_str(str_list):
+        return toolz.reduce(lambda x, y: x if x < y else y, str_list)
+
+    # first elements:
+    elements = {}
+    for n, it in dict_of_iterators.items():
+        key, value = next(it)
+        elements[n] = (key, value)
+    current_keys = toolz.valmap(lambda keyvalue: keyvalue[0], elements)
+    current_min = minimum_str(current_keys.values())  # the smallest CB/UMI tuple
+
+    while len(dict_of_iterators) > 0:
+        # whichever iterators have the minimum value:
+        to_emit = []  # record the names of iterators that will emit an item
+        for n, key in current_keys.items():
+            if key == current_min:
+                to_emit.append(n)
+
+        # emit all candidates,
+        emit_values = {}
+        for candidate_name in to_emit:
+            key, value = elements[candidate_name]
+            emit_values[candidate_name] = value
+
+        yield current_min, emit_values
+
+        #  advance their iterators
+        for candidate_name in to_emit:
+            try:
+                key, value = next(dict_of_iterators[candidate_name])
+                elements[candidate_name] = (key, value)
+            except StopIteration:
+                del dict_of_iterators[candidate_name]
+                del current_keys[candidate_name]
+                del elements[candidate_name]
+
+        # new minimum!
+        if len(dict_of_iterators) > 0:
+            current_keys = toolz.valmap(lambda key_value: key_value[0], elements)
+            current_min = minimum_str(current_keys.values())
+        else:
+            break
+
 
 def iterate_bus_cells_umi_multiple(names, fname_list, decode_seq=True):
 
