@@ -1,4 +1,4 @@
-from pybustools import busio, busio_old
+from pybustools import busio
 import pathlib
 import toolz
 
@@ -171,7 +171,3 @@ def iterate_bus_cells_multiple(names, fname_list, decode_seq=True):
 
     for cb, info in merge_iterators(iterators):
         yield cb, info
-
-
-if __name__ == '__main__':
-    pass

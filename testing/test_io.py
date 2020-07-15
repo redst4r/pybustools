@@ -23,25 +23,24 @@ def test_decode_int_to_ACGT():
     assert busio._decode_int_to_ACGT(3, seq_len=1) == 'T'
 
     # padding leading A's
-    assert busio._decode_int_to_ACGT(0,seq_len=3) == 'AAA'
-    assert busio._decode_int_to_ACGT(1,seq_len=3) == 'AAC'
-    assert busio._decode_int_to_ACGT(2,seq_len=3) == 'AAG'
-    assert busio._decode_int_to_ACGT(3,seq_len=3) == 'AAT'
+    assert busio._decode_int_to_ACGT(0, seq_len=3) == 'AAA'
+    assert busio._decode_int_to_ACGT(1, seq_len=3) == 'AAC'
+    assert busio._decode_int_to_ACGT(2, seq_len=3) == 'AAG'
+    assert busio._decode_int_to_ACGT(3, seq_len=3) == 'AAT'
 
+    assert busio._decode_int_to_ACGT(4, seq_len=2) == 'CA'  # note that AA is still 0
+    assert busio._decode_int_to_ACGT(5, seq_len=2) == 'CC'
+    assert busio._decode_int_to_ACGT(6, seq_len=2) == 'CG'
+    assert busio._decode_int_to_ACGT(7, seq_len=2) == 'CT'
 
-    assert busio._decode_int_to_ACGT(4,seq_len=2) == 'CA' # note that AA is still 0
-    assert busio._decode_int_to_ACGT(5,seq_len=2) == 'CC'
-    assert busio._decode_int_to_ACGT(6,seq_len=2) == 'CG'
-    assert busio._decode_int_to_ACGT(7,seq_len=2) == 'CT'
-
-    assert busio._decode_int_to_ACGT(148,seq_len=4) == 'GCCA'
+    assert busio._decode_int_to_ACGT(148, seq_len=4) == 'GCCA'
 
     # make sure to raise an error when the decoded string is actually longer
     # then requested (since its probably a bug in the code calling _decode_int_to_ACGT)
     with pytest.raises(AssertionError):
-        busio._decode_int_to_ACGT(148,seq_len=2)
+        busio._decode_int_to_ACGT(148, seq_len=2)
     with pytest.raises(AssertionError):
-        busio._decode_int_to_ACGT(-1,seq_len=1)
+        busio._decode_int_to_ACGT(-1, seq_len=1)
 
 
 def test_encode_decode():
@@ -50,6 +49,7 @@ def test_encode_decode():
 
     seq = 'AAAATTTTGGGGCCCC'
     assert busio._decode_int_to_ACGT(busio._encode_ACGT_to_int(seq), len(seq)) == seq
+
 
 def test_get_header(tmp_path):
 
@@ -60,10 +60,11 @@ def test_get_header(tmp_path):
     ]
     fname = tmp_path / 'some.bus'
     busio.write_busfile(fname, records, cb_length=12, umi_length=5)
-    
-    _ ,cb, umi, _ = busio.get_header_info(fname)
-    assert cb == 12 and umi==5
-    
+
+    _, cb, umi, _ = busio.get_header_info(fname)
+    assert cb == 12 and umi == 5
+
+
 def test_read_write(tmp_path):
 
     records = [
@@ -159,7 +160,7 @@ def transcript_file():
 def test_read_matrix_ec(ec_matrix_file):
     ec_dict = busio.read_matrix_ec(ec_matrix_file)
     assert len(ec_dict) == 10
-    assert ec_dict[0] == [1,2,3,4]
+    assert ec_dict[0] == [1, 2, 3, 4]
 
 
 def test_read_transcripts(transcript_file):

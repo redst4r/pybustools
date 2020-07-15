@@ -1,7 +1,4 @@
-import pytest
 from pybustools import busio, pybustools
-import pathlib
-import os
 
 
 def test_iterate_cells(tmp_path):
