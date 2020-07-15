@@ -221,55 +221,12 @@ def merge_iterators(dict_of_iterators):
 
 def iterate_bus_cells_umi_multiple(names, fname_list, decode_seq=True):
 
-    def minimum_str(str_list):
-        return toolz.reduce(lambda x, y: x if x < y else y, str_list)
-
     # a dict of all the busfile-iterators
     iterators = {n: iterate_CB_UMI_of_busfile(fname, decode_seq)
                  for n, fname in zip(names, fname_list)}
 
-    # the CB/UMI iterator will yield tuples of CB,UMI
-    # luckily python does the righth thing for tuple comparison, i.e. > < work
-
-    # first elements:
-    elements = {}
-    for n, it in iterators.items():
-        cb_umi, info = next(it)
-        elements[n] = (cb_umi, info)
-    current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
-    current_min = minimum_str(current_cbs.values())  # the smallest CB/UMI tuple
-
-    while len(iterators) > 0:
-        # whichever iterators have the minimum value:
-        to_emit = []  # record the names of iterators that will emit an item
-        for n, cb_umi in current_cbs.items():
-            if cb_umi == current_min:
-                to_emit.append(n)
-
-        # emit all candidates,
-        emit_infos = {}
-        for candidate_name in to_emit:
-            cb_umi, info = elements[candidate_name]
-            emit_infos[candidate_name] = info
-
-        yield current_min, emit_infos
-
-        #  advance their iterators
-        for candidate_name in to_emit:
-            try:
-                cb_umi, info = next(iterators[candidate_name])
-                elements[candidate_name] = (cb_umi, info)
-            except StopIteration:
-                del iterators[candidate_name]
-                del current_cbs[candidate_name]
-                del elements[candidate_name]
-
-        # new minimum!
-        if len(iterators) > 0:
-            current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
-            current_min = minimum_str(current_cbs.values())
-        else:
-            break
+    for (cb, umi), info in merge_iterators(iterators):
+        yield (cb, umi), info
 
 
 def iterate_bus_cells_multiple(names, fname_list, decode_seq=True):
@@ -283,53 +240,12 @@ def iterate_bus_cells_multiple(names, fname_list, decode_seq=True):
         }
     """
 
-    def minimum_str(str_list):
-        return toolz.reduce(lambda x, y: x if x < y else y, str_list)
-
     # a dict of all the busfile-iterators
     iterators = {n: iterate_cells_of_busfile(fname, decode_seq)
                  for n, fname in zip(names, fname_list)}
 
-    # first elements:
-    elements = {}
-    for n, it in iterators.items():
-        cb, info = next(it)
-        elements[n] = (cb, info)
-    current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
-    current_min = minimum_str(current_cbs.values())
-
-    while len(iterators) > 0:
-        # whichever iterators have the minimum value:
-        to_emit = []  # record the names of iterators that will emit an item
-        for n, cb in current_cbs.items():
-            if cb == current_min:
-                to_emit.append(n)
-
-        # emit all candidates,
-        emit_infos = {}
-        for candidate_name in to_emit:
-            cb, info = elements[candidate_name]
-            emit_infos[candidate_name] = info
-
-        yield current_min, emit_infos
-        # print(current_min, emit_infos)
-
-        #  advance their iterators
-        for candidate_name in to_emit:
-            try:
-                cb, info = next(iterators[candidate_name])
-                elements[candidate_name] = (cb, info)
-            except StopIteration:
-                del iterators[candidate_name]
-                del current_cbs[candidate_name]
-                del elements[candidate_name]
-
-        # new minimum!
-        if len(iterators) > 0:
-            current_cbs = toolz.valmap(lambda cb_and_info: cb_and_info[0], elements)
-            current_min = minimum_str(current_cbs.values())
-        else:
-            break
+    for cb, info in merge_iterators(iterators):
+        yield cb, info
 
 
 if __name__ == '__main__':
