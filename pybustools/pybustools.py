@@ -38,7 +38,7 @@ def iterate_cells_of_busfile(fname, decode_seq=True):
     current_info = [(umi, ec, count, flag)]
 
     for cb, umi, ec, count, flag in bus_iterator:
-        if cb != current_cell:
+        if cb > current_cell:
             # we're finished with one cells, yield it and start the next
             yield current_cell, current_info
 
@@ -46,8 +46,10 @@ def iterate_cells_of_busfile(fname, decode_seq=True):
             # process results and reset
             current_cell = cb
             current_info = [(umi, ec, count, flag)]
-        else:
+        elif cb == current_cell:
             current_info.append((umi, ec, count, flag))
+        else:
+            raise ValueError(f'Bus file not sorted!! {cb} vs {current_cell}')
 
     # emitting the final cell
     yield current_cell, current_info
@@ -66,7 +68,8 @@ def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
     current_umi = umi
     current_info = [(ec, count, flag)]
     for cb, umi, ec, count, flag in bus_iterator:
-        if cb != current_cell or umi != current_umi:
+        if cb > current_cell or (cb == current_cell and umi > current_umi):
+
             yield (current_cell, current_umi), current_info
 
             # reset for the next cell/UMI
@@ -74,9 +77,10 @@ def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
             current_cell = cb
             current_umi = umi
             current_info = [(ec, count, flag)]
-
-        else:
+        elif cb == current_cell and umi == current_umi:
             current_info.append((ec, count, flag))
+        else:
+            raise ValueError(f'bsufile unsorted:  {cb}/{umi}  vs {current_cell}/{current_umi}')
 
     yield (current_cell, current_umi), current_info
 

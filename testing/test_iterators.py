@@ -1,5 +1,5 @@
 from pybustools import busio, pybustools
-
+import pytest
 
 def test_iterate_cells(tmp_path):
     records = [
@@ -21,7 +21,7 @@ def test_iterate_cells(tmp_path):
     assert cb2 == 'TAGA' and len(list2) == 1
 
     cb3, list3 = next(gen)
-    assert cb3 == 'TTAT' and len(list2) == 1
+    assert cb3 == 'TTAT' and len(list3) == 1
 
 
 def test_iterate_cb_umi(tmp_path):
@@ -49,3 +49,49 @@ def test_iterate_cb_umi(tmp_path):
 
     cb4, list4 = next(gen)
     assert cb4 == ('TTAT', 'AAA') and len(list4) == 1
+
+
+def test_iterate_cells_raise_unsorted(tmp_path):
+    """
+    iterate_cells must raise an error of the busfile is unsorted (in terms of CBs)
+    """
+    records = [
+        busio.Bus_record('TTAT', 'AAA', 13, 206, 12),
+        busio.Bus_record('ATAT', 'AAA', 10, 20, 1),
+        busio.Bus_record('TAGA', 'TAT', 14, 250, 13),
+    ]
+    fname = tmp_path / 'some.bus'
+    busio.write_busfile(fname, records, cb_length=4, umi_length=3)
+
+    with pytest.raises(ValueError):
+        gen = pybustools.iterate_cells_of_busfile(fname)
+        list(gen)
+
+
+def test_iterate_cells_UMI_raise_unsorted(tmp_path):
+    """
+    iterate_CB_UMI_of_busfile must raise an error of the busfile is unsorted (in terms of CBs)
+    """
+    records = [
+        busio.Bus_record('ATAT', 'TAT', 14, 250, 13),
+        busio.Bus_record('ATAT', 'AAA', 10, 20, 1),
+    ]
+    fname = tmp_path / 'some.bus'
+    busio.write_busfile(fname, records, cb_length=4, umi_length=3)
+
+    with pytest.raises(ValueError):
+        gen = pybustools.iterate_CB_UMI_of_busfile(fname)
+        list(gen)
+
+    """
+    also check that it raises when the CB is unsorted
+    """
+    records = [  # impotant: the UMI should be the same,
+        busio.Bus_record('TTAT', 'TAT', 14, 250, 13),
+        busio.Bus_record('ATAT', 'TAT', 10, 20, 1),
+    ]
+    fname = tmp_path / 'some.bus'
+    busio.write_busfile(fname, records, cb_length=4, umi_length=3)
+    with pytest.raises(ValueError):
+        gen = pybustools.iterate_CB_UMI_of_busfile(fname)
+        list(gen)
