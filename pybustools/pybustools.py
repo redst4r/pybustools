@@ -55,6 +55,38 @@ def iterate_cells_of_busfile(fname, decode_seq=True):
     yield current_cell, current_info
 
 
+def iterate_cells_of_busfile_new(fname, decode_seq=True):
+    """
+    runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
+    and yield it as `cb,info_list`
+
+    this one returns a list of BusRecords
+    """
+    bus_iterator = busio.read_binary_bus(fname, decode_seq)
+
+    # get the first entry to get started
+    record = next(bus_iterator)
+    current_cell = record.CB
+    current_info = [record]
+
+    for record in bus_iterator:
+        if record.CB > current_cell:
+            # we're finished with one cells, yield it and start the next
+            yield current_cell, current_info
+
+            # reset for the next cell
+            # process results and reset
+            current_cell = record.CB
+            current_info = [record]
+        elif record.CB == current_cell:
+            current_info.append(record)
+        else:
+            raise ValueError(f'Bus file not sorted!! {record.CB} vs {current_cell}')
+
+    # emitting the final cell
+    yield current_cell, current_info
+
+
 def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
     """
     iterates over CB/UMI entries, i.e. all entries with the same CB/UMI
