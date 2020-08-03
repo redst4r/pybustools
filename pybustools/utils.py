@@ -89,6 +89,16 @@ def h5_to_bus(h5filename, busfile_output):
                            0)
             yield b
 
-    write_busfile(busfile_output, _gen(), cb_length=16, umi_length=12)
+    TMPDIR = '/home/mstrasse/mountSSD/tmp'
+    unsorted_name = tempfile.mkstemp('.bus', 'unsorted_', TMPDIR)[1]
+
+    write_busfile(unsorted_name, _gen(), cb_length=16, umi_length=12)
 
     fh.close()
+    
+    
+    print('sorting')
+    ret = subprocess.run(["bustools", "sort", '-o', busfile_output, unsorted_name])
+    if ret.returncode != 0:
+        print("Child was terminated by signal", ret, file=sys.stderr)
+        raise ValueError()
