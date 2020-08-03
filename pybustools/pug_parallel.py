@@ -2,16 +2,10 @@ import multiprocessing as mp
 import collections
 import itertools
 import os
-import numpy as np
-import networkx as nx
-import Levenshtein
-import pybktree
 from pybustools.pybustools import Bus
 from pybustools.busio import Bus_record, write_busfile
 from pybustools.pybustools import iterate_cells_of_busfile_new
 import tqdm
-import toolz
-import itertools
 from pybustools import busio
 import tempfile
 
@@ -108,12 +102,13 @@ def in_parallel(bus, outfile, cores):
         t.join()
 
     # cleanup
-    assert cb_queue.empty()
+    assert cb_queue.empty(), "queue not empty!!"
     cb_queue.close()
 
     for t in worker_tasks:
         t.close()
 
+    # merge all busfiles into a big one!
     bus_iterators = []
     for i in range(cores):
         busfile = f'{tmpfolder}/{i}.bus'
@@ -121,12 +116,23 @@ def in_parallel(bus, outfile, cores):
         bus_iterators.append(gen)
 
     big_gen = itertools.chain.from_iterable(bus_iterators)
-    write_busfile(outfile, big_gen, cb_length=16, umi_length=12)
+    unsorted_outfile = f'{tmpfolder}/unsorted.bus'
+    write_busfile(unsorted_outfile, big_gen, cb_length=16, umi_length=12)
 
+    # cleanup the parts
     for i in range(cores):
         busfile = f'{tmpfolder}/{i}.bus'
         os.remove(busfile)
 
+    # sort the file
+    import subprocess
+    import sys
+    ret = subprocess.run(["bustools", "sort", '-o', outfile, unsorted_outfile])
+    if ret.returncode != 0:
+        print("Child was terminated by signal", ret, file=sys.stderr)
+        raise ValueError()
+
+    # os.remove(busfile)
 
 # bus = Bus('/home/mstrasse/mountSSD/kallisto_out/trimmed-kallisto/novaseq.190919_A00266_0278_BHFJY5DRXX_ParkFoulkesCRUK.L05A_2-658952_cellranger_v3p0p1_refdata-cellranger-GRCh38-3_0_0.outs/kallisto/sort_bus/bus_output')
 in_parallel(bus, '/tmp/finally.bus', cores=6)
