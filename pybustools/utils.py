@@ -68,7 +68,7 @@ def h5_to_bus(h5filename, busfile_output):
     turns a 10x molecule_info.h5 into a "fake" bus file:
     Instead of EC, we just report the actual gene cellranger mapped the read.
     """
-    fh = h5py.File(h5filename)
+    fh = h5py.File(h5filename, mode='r')
     CB_list = [_.decode() for _ in fh['/barcodes'][:]]
     gene_list = [_.decode() for _ in fh['/features/name'][:]]
     n_entries = fh['/barcode_idx'].shape[0]
@@ -96,7 +96,7 @@ def h5_to_bus(h5filename, busfile_output):
 
     fh.close()
     
-    
+
     print('sorting')
     ret = subprocess.run(["bustools", "sort", '-o', busfile_output, unsorted_name])
     if ret.returncode != 0:
