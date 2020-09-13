@@ -4,6 +4,8 @@ import os
 import tempfile
 import subprocess
 import sys
+import h5py
+from pybustools.busio import Bus_record, write_busfile, _encode_ACGT_to_int
 
 
 def count_cb_umi_pairs(busfile):
@@ -60,17 +62,18 @@ def bus_to_countmatrix(busfile, ec_file, transcript_file, outfolder):
     """
 
 
-import tqdm
-import h5py
-from pybustools.busio import Bus_record, write_busfile, _encode_ACGT_to_int
-def h5_to_bus(h5filename, busfile_output):
+def h5_to_bus(h5filename, busfile_output, TMPDIR=None):
     """
     turns a 10x molecule_info.h5 into a "fake" bus file:
     Instead of EC, we just report the actual gene cellranger mapped the read.
+
+    :param h5filename: path to the h5file
+    :param busfile_output: path to the busfile to be created
+    :param TMPDIR: optional, path to store temporary files
     """
     fh = h5py.File(h5filename, mode='r')
     CB_list = [_.decode() for _ in fh['/barcodes'][:]]
-    gene_list = [_.decode() for _ in fh['/features/name'][:]]
+    # gene_list = [_.decode() for _ in fh['/features/name'][:]]
     n_entries = fh['/barcode_idx'].shape[0]
 
     cbs_idx = fh['/barcode_idx'][:]
@@ -89,16 +92,29 @@ def h5_to_bus(h5filename, busfile_output):
                            0)
             yield b
 
-    TMPDIR = '/home/mstrasse/mountSSD/tmp'
     unsorted_name = tempfile.mkstemp('.bus', 'unsorted_', TMPDIR)[1]
 
     write_busfile(unsorted_name, _gen(), cb_length=16, umi_length=12)
 
     fh.close()
-    
+
 
     print('sorting')
     ret = subprocess.run(["bustools", "sort", '-o', busfile_output, unsorted_name])
     if ret.returncode != 0:
         print("Child was terminated by signal", ret, file=sys.stderr)
         raise ValueError()
+
+    # note that the tmp file wont be deleted if an exception happens above!
+    os.unlink(unsorted_name)
+
+    
+    # in addition create matrix.ec and transcripts.txt
+    # Matrix.ec is a two column text file with
+    # EC_id  --> [transcript_ID]
+    #
+    # nd transcripts.txt is just transcript names (ENST....), one per line (linenumber == transcript_ID)
+    # 
+    # TODO: DO THIS, currently not even enccessary, as we only use this to determine non-unique CB/UMIs across multiple bus files
+    
+    
