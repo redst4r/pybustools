@@ -24,38 +24,13 @@ class Bus():
     def iterate_cells(self):
         return iterate_cells_of_busfile(self.bus_file, decode_seq=self.decode_seq)
 
+    def resolve_EC_to_transcripts(self, EC):
+        "which transcript IDs correspond to the Equivalence class"
+        transcripts = [self.transcript_dict[_] for _ in self.ec_dict[EC]]
+        return transcripts
+
 
 def iterate_cells_of_busfile(fname, decode_seq=True):
-    """
-    runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
-    and yield it as `cb,info_list`
-    """
-    bus_iterator = busio.read_binary_bus(fname, decode_seq)
-
-    # get the first entry to get started
-    cb, umi, ec, count, flag = next(bus_iterator)
-    current_cell = cb
-    current_info = [(umi, ec, count, flag)]
-
-    for cb, umi, ec, count, flag in bus_iterator:
-        if cb > current_cell:
-            # we're finished with one cells, yield it and start the next
-            yield current_cell, current_info
-
-            # reset for the next cell
-            # process results and reset
-            current_cell = cb
-            current_info = [(umi, ec, count, flag)]
-        elif cb == current_cell:
-            current_info.append((umi, ec, count, flag))
-        else:
-            raise ValueError(f'Bus file not sorted!! {cb} vs {current_cell}')
-
-    # emitting the final cell
-    yield current_cell, current_info
-
-
-def iterate_cells_of_busfile_new(fname, decode_seq=True):
     """
     runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
     and yield it as `cb,info_list`
@@ -67,24 +42,24 @@ def iterate_cells_of_busfile_new(fname, decode_seq=True):
     # get the first entry to get started
     record = next(bus_iterator)
     current_cell = record.CB
-    current_info = [record]
+    current_recordlist = [record]
 
     for record in bus_iterator:
         if record.CB > current_cell:
             # we're finished with one cells, yield it and start the next
-            yield current_cell, current_info
+            yield current_cell, current_recordlist
 
             # reset for the next cell
             # process results and reset
             current_cell = record.CB
-            current_info = [record]
+            current_recordlist = [record]
         elif record.CB == current_cell:
-            current_info.append(record)
+            current_recordlist.append(record)
         else:
             raise ValueError(f'Bus file not sorted!! {record.CB} vs {current_cell}')
 
     # emitting the final cell
-    yield current_cell, current_info
+    yield current_cell, current_recordlist
 
 
 def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
@@ -95,26 +70,26 @@ def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
     """
     bus_iterator = busio.read_binary_bus(fname, decode_seq)
 
-    cb, umi, ec, count, flag = next(bus_iterator)
-    current_cell = cb
-    current_umi = umi
-    current_info = [(ec, count, flag)]
-    for cb, umi, ec, count, flag in bus_iterator:
-        if cb > current_cell or (cb == current_cell and umi > current_umi):
+    record = next(bus_iterator)
+    current_cell = record.CB
+    current_umi = record.UMI
+    current_recordlist = [record]
+    for record in bus_iterator:
+        if record.CB > current_cell or (record.CB == current_cell and record.UMI > current_umi):
 
-            yield (current_cell, current_umi), current_info
+            yield (current_cell, current_umi), current_recordlist
 
             # reset for the next cell/UMI
             # process results and reset
-            current_cell = cb
-            current_umi = umi
-            current_info = [(ec, count, flag)]
-        elif cb == current_cell and umi == current_umi:
-            current_info.append((ec, count, flag))
+            current_cell = record.CB
+            current_umi = record.UMI
+            current_recordlist = [record]
+        elif record.CB == current_cell and record.UMI == current_umi:
+            current_recordlist.append(record)
         else:
-            raise ValueError(f'bsufile unsorted:  {cb}/{umi}  vs {current_cell}/{current_umi}')
+            raise ValueError(f'bsufile unsorted:  {record.CB}/{record.UMI}  vs {current_cell}/{current_umi}')
 
-    yield (current_cell, current_umi), current_info
+    yield (current_cell, current_umi), current_recordlist
 
 
 def merge_iterators(dict_of_iterators):

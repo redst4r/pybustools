@@ -28,6 +28,12 @@ def test_ParallelCellGenerator():
 
     assert parallel_results == serial_results
 
+    # check that they return Bus_records, not just tuples
+    for cb, info in parallel_results.items():
+        for sample, record_list in info.items():
+            for r in record_list:
+                assert isinstance(r, busio.Bus_record)
+
 
 def test_ParallelCellUMIGenerator():
     """
@@ -53,3 +59,9 @@ def test_ParallelCellUMIGenerator():
     serial_results = {cbumi: info for cbumi, info in iterate_bus_cells_umi_multiple(['sample1', 'sample2', 'sample3'], [fname1, fname2, fname3])}
 
     assert parallel_results == serial_results
+
+    # check that they return Bus_records, not just tuples
+    for cbumi, info in parallel_results.items():
+        for sample, record_list in info.items():
+            for r in record_list:
+                assert isinstance(r, busio.Bus_record)

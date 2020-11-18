@@ -1,6 +1,29 @@
 from pybustools import busio, pybustools
 import pytest
 
+
+def test_return_busrecord(tmp_path):
+    """
+    make sure the functions return the namedtuple, not just the tuple
+    """
+    records = [
+        busio.Bus_record('ATAT', 'AAA', 10, 20, 1),
+        busio.Bus_record('ATAT', 'GGG', 10, 20, 1),
+        busio.Bus_record('TAGA', 'TAT', 14, 250, 13),
+        busio.Bus_record('TTAT', 'AAA', 13, 206, 12),
+    ]
+    fname = tmp_path / 'some.bus'
+    busio.write_busfile(fname, records, cb_length=4, umi_length=3)
+
+    for cb, record_list in pybustools.iterate_cells_of_busfile(fname):
+        for r in record_list:
+            assert isinstance(r, busio.Bus_record)
+
+    for cbumi, record_list in pybustools.iterate_CB_UMI_of_busfile(fname):
+        for r in record_list:
+            assert isinstance(r, busio.Bus_record)
+
+
 def test_iterate_cells(tmp_path):
     records = [
         busio.Bus_record('ATAT', 'AAA', 10, 20, 1),
@@ -16,12 +39,15 @@ def test_iterate_cells(tmp_path):
     # the first record must have two uMIs
     cb1, list1 = next(gen)
     assert cb1 == 'ATAT' and len(list1) == 2
+    assert list1 == records[:2]
 
     cb2, list2 = next(gen)
     assert cb2 == 'TAGA' and len(list2) == 1
+    assert list2 == [records[2]]
 
     cb3, list3 = next(gen)
     assert cb3 == 'TTAT' and len(list3) == 1
+    assert list3 == [records[3]]
 
 
 def test_iterate_cb_umi(tmp_path):

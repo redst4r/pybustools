@@ -4,6 +4,9 @@ import multiprocessing as mp
 # import time
 import random
 import toolz
+from  pybustools.busio import Bus_record
+
+
 """
 for each file, we use a separate process to load bus entries from the file
 and group the entries.
@@ -137,21 +140,33 @@ def cell_producer(fname, out_queue, decode_seq):
     """
     turns iterate_cells_of_busfile into a queue
     """
-    for record in iterate_cells_of_busfile(fname, decode_seq):
+    for cb, record_list in iterate_cells_of_busfile(fname, decode_seq):
         # print('Putting record:', fname, record[0])
-        out_queue.put(record)
+
+        # due to some dumb pickling issues, we cant pickle a namedtuple directly
+        # hence deconstruct it and put that onto the queue
+        record_list = [_namedtuple_to_tuple(r) for r in record_list]
+        out_queue.put((cb, record_list))
         # print('sleeping')
         # time.sleep(random.randrange(1,3))
     out_queue.put(TERMINATOR)
+
+
+def _namedtuple_to_tuple(nt):
+    return tuple(nt)
 
 
 def cell_umi_producer(fname, out_queue, decode_seq):
     """
     turns iterate_CB_UMI_of_busfile into a queue
     """
-    for record in iterate_CB_UMI_of_busfile(fname, decode_seq):
+    for cb_umi, record_list in iterate_CB_UMI_of_busfile(fname, decode_seq):
         # print('Putting record:', fname, record[0])
-        out_queue.put(record)
+
+        # due to some dumb pickling issues, we cant pickle a namedtuple directly
+        # hence deconstruct it and put that onto the queue
+        record_list = [_namedtuple_to_tuple(r) for r in record_list]
+        out_queue.put((cb_umi, record_list))
         # print('sleeping')
         # time.sleep(random.randrange(1,3))
     out_queue.put(TERMINATOR)
@@ -165,7 +180,11 @@ def _helper_queue_iterator(queue):
     if result == TERMINATOR:
         raise StopIteration
     else:
-        return result
+        # due to some dumb pickling issues, we cant pickle a namedtuple directly
+        # hence deconstruct it and put that onto the queue
+        index, record_list = result
+        record_list = [Bus_record(*r) for r in record_list]
+        return index, record_list
 
 
 def parallel_iterate_bus_cells_pairs_basic(fname1, fname2, decode_seq=True):
