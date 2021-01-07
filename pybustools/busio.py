@@ -57,7 +57,7 @@ def parse_header_info(header_bytes):
     return version, cb_len, umi_len, tlen
 
 
-def read_binary_bus(fname, decode_seq:bool=True, buffersize=20000):
+def read_binary_bus(fname, decode_seq:bool=True, buffersize=20000, verbose=False):
     """
     iterating over a binary busfile, yielding (CB,UMI,EC,Counts,Flag)
 
@@ -76,8 +76,9 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=20000):
         # read the free header
         free_header = struct.unpack(f'{tlen}s', fh.read(tlen))
 
-        print(f'Bustools {version}, CB length {cb_len}, UMI length {umi_len}')
-        print(f'Free header  {free_header}')
+        if verbose:
+            print(f'Bustools {version}, CB length {cb_len}, UMI length {umi_len}')
+            print(f'Free header  {free_header}')
 
         BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
         unpack_str = 'QQiIIxxxx'
