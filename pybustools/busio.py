@@ -57,7 +57,7 @@ def parse_header_info(header_bytes):
     return version, cb_len, umi_len, tlen
 
 
-def read_binary_bus(fname, decode_seq:bool=True, buffersize=1000):
+def read_binary_bus(fname, decode_seq:bool=True, buffersize=20000):
     """
     iterating over a binary busfile, yielding (CB,UMI,EC,Counts,Flag)
 
@@ -80,13 +80,13 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=1000):
         print(f'Free header  {free_header}')
 
         BUS_ENTRY_SIZE = 32  # each entry is 32 bytes!!
-        unpack_str = 'QQiIII'
+        unpack_str = 'QQiIIxxxx'
+        iter_unpack = struct.iter_unpack
         for bus_chunk in iter(partial(fh.read, BUS_ENTRY_SIZE * buffersize), b''):
             # iterate over each single entry in the loaded chunk.
             # mote that struct.iter_unpack neatly turns the chunk into an
             # iterator
-            for cb, umi, ec, count, flags, pad in struct.iter_unpack(unpack_str, bus_chunk):
-                assert pad == 0
+            for cb, umi, ec, count, flags in iter_unpack(unpack_str, bus_chunk):
                 if decode_seq:
                     cb = _decode_int_to_ACGT(cb, cb_len)
                     umi = _decode_int_to_ACGT(umi, umi_len)
