@@ -28,4 +28,4 @@ def test_merge_fail_unsorted():
     I2 = zip(['A', 'B', 'D'], [10, 20, 30])
 
     with pytest.raises(AssertionError):
-        merge_iterators({'I1': I1, 'I2': I2})
+        list(merge_iterators({'I1': I1, 'I2': I2}))  # list( ) to pull the items of the generator!

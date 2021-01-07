@@ -150,7 +150,9 @@ def merge_iterators(dict_of_iterators):
         # new minimum!
         if len(dict_of_iterators) > 0:
             current_keys = toolz.valmap(lambda key_value: key_value[0], elements)
-            current_min = minimum_str(current_keys.values())
+            new_min = minimum_str(current_keys.values())
+            assert new_min > current_min, "some iterator is not sorted!"
+            current_min = new_min
         else:
             break
 
