@@ -91,8 +91,16 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=20000, verbose=False
                 if decode_seq:
                     cb = _decode_int_to_ACGT(cb, cb_len)
                     umi = _decode_int_to_ACGT(umi, umi_len)
-
-                yield Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
+            
+                # Here's a slight speed improvement: 
+                # just create the namedtuple without keyword args makes it quite a bit faster
+                # for 100000 records:
+                # keyworkds:   ~65ms
+                # no keywords: ~35ms
+                #
+                # note that the fastest is still just a normal tuple (16ms) but that makes downstream usage ugly
+                # yield Bus_record(CB=cb, UMI=umi, EC=ec, COUNT=count, FLAG=flags)
+                yield Bus_record(cb, umi, ec, count, flags)
 
 
 def read_matrix_ec(fname):
