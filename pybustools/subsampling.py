@@ -1,8 +1,14 @@
 import numpy as np
 from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_header_info
+from pybustools.pybustools import iterate_CB_UMI_of_busfile
 import tqdm
 import os
 import shutil
+import numba
+import gc
+import collections
+import time
+import pandas as pd
 
 
 def get_number_of_reads_and_molecules(fname):
@@ -21,6 +27,43 @@ def get_number_of_reads_and_molecules(fname):
         total_reads += record.COUNT
         total_molecules += 1
     return total_reads, total_molecules
+
+
+def subsample_bus_unseens_species(busfile, fractions):
+    """
+    subsamples the given bus file at different depth, and records the number of reads/umis obtained
+    returns a DataFrame with the nReads and nUMIs as well as the UMI prevalences (duplicity of an umi -> #observations of that duplicity)
+    """
+    gc.collect()
+
+    assert all([0 <= _ <= 1 for _ in fractions]), "Fractions must be in [0,1]"
+    reads = []
+
+    # lets group entires by CB/UMI instead of CB/UMI/EC (as done via B.iterate_bus())
+    # and sum the counts over ECs
+    for (cb, umi), record_list in tqdm.tqdm(iterate_CB_UMI_of_busfile(busfile, decode_seq=False)):
+        s = sum([r.COUNT for r in record_list])
+        reads.append(s)
+
+    reads = np.array(reads)
+    prevalences = collections.Counter(reads)
+
+    df = []
+    total = reads.sum()
+    for percent in fractions:
+        print(percent)
+        target = int(percent * total)
+        y = _downsample_array(reads, target=target, random_state=int(time.time()*1000), replace=False)
+
+        numis = (y > 0).sum()
+        df.append({
+            'nUMIs': numis,
+            'percent': percent,
+            'nReads':  target,
+            'nReads2':  y.sum()
+        })
+    df = pd.DataFrame(df)
+    return df, prevalences
 
 
 def subsample_busfile(fname_in, fname_out, fraction):
@@ -49,7 +92,7 @@ def subsample_busfile(fname_in, fname_out, fraction):
     n_total = np.sum(huge_array)
     n_target = int(n_total * fraction)
     print(f'Subsampling from {n_total} to {n_target}')
-    x = _downsample_array(huge_array, target=n_target, replace=False, inplace=False)
+    x = _downsample_array(huge_array, target=n_target, random_state=int(time.time()*1000), replace=False, inplace=False)
     print(f'Downsampled reads: {x.sum()}')
 
     # create a generator for the bus-records
@@ -66,10 +109,11 @@ def subsample_busfile(fname_in, fname_out, fraction):
     write_busfile(fname_out, G, cb_length=cb_len, umi_length=umi_len)
 
 
+@numba.njit(cache=True)
 def _downsample_array(
     col: np.ndarray,
     target: int,
-    # random_state: AnyRandom = 0,
+    random_state=0,
     replace: bool = True,
     inplace: bool = False,
 ):
@@ -100,23 +144,23 @@ def subsample_kallisto_bus(busdir, outdir, fraction):
     """
     not only subsamples the .bus file, but also sets up a folder that looks like a original kallisto quantification
     so that `bustools count` can be run on it
-    
-    :param busdir: directory containing the bustools quantification (if nextflow: .../kallisto/sort_bus/bus_output). 
+
+    :param busdir: directory containing the bustools quantification (if nextflow: .../kallisto/sort_bus/bus_output).
                    must contain `output.corrected.sort.bus`, `matrix.ec`, `transcripts.txt`
-                   
+
     :param outdir: must exist. puts the downsampled kallisto .bus and suppl.files here
     :param fraction: 0<fraction<1: fraction of reads to sample
-    
+
     """
     assert os.path.exists(outdir)
     infile = f'{busdir}/output.corrected.sort.bus'
     outfile = f'{outdir}/output.corrected.sort.bus'
 
     subsample_busfile(infile, outfile, fraction=fraction)
-        
+
     # copy the other parts of the kallisto output, they remain unchanged
     ec = f'{busdir}/matrix.ec'
     transcripts = f'{busdir}/transcripts.txt'
-    
+
     shutil.copy(ec, outdir)
-    shutil.copy(transcripts, outdir)  
+    shutil.copy(transcripts, outdir)
