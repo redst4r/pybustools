@@ -66,5 +66,13 @@ cDNA2:  ------------------------     <-  EC: {E1,E2}
 4. Presumably, it can also map to a completely different region, due to sequencing/PCR errors!?
 
 
+## Speed
+It's generally pretty fast when turning off the sequence decoding.
+We can process approximately 2 million bus entries per second (standard hardware).
+Slight gains might be achived by tuning the buffersize:
+![image](speed/buffer_vs_time.png)
+(y-axis is sec/1e7 entries)
+
+
 ## TODO
 - parsing the binary format is slow; the bottleneck is `busio._decode_int_to_ACGT()` and `gmpy2.digits()` in there. This converts the int encoding into cDNA sequence
