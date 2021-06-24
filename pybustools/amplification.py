@@ -11,7 +11,8 @@ a few functions to measure the 10x library amplification in kallisto-bus files
 """
 
 
-def create_per_EC_amp(bus: Bus):
+
+def create_per_EC_amp(bus: Bus, t2gfile = '/home/mstrasse/resources/transcripts_to_genes.txt'):
     """
     quantify the cDNA amplification of each molecule, grouped by EC
     (equivalence class, related to gene). The resulting dataframe will have one
@@ -33,7 +34,7 @@ def create_per_EC_amp(bus: Bus):
     df = pd.DataFrame(df)
 
     # add some more info to the EC
-    t2g_df = pd.read_csv('/home/mstrasse/resources/transcripts_to_genes.txt',
+    t2g_df = pd.read_csv(t2gfile,
                          sep='\t', header=None,
                          names=['transcript_id', 'gene_id', 'symbol'])
     t2g = {row['transcript_id']: row['symbol'] for _, row in t2g_df.iterrows()}
@@ -64,7 +65,7 @@ def create_per_cell_amp(bus: Bus):
         cb_counts[record.CB].append(record.COUNT)
     df_cb = [
         {'cb': cb,
-         'nUMIs': len(cb_counts[cb]),
+         'nUMI': len(cb_counts[cb]),
          'mean_amp': np.mean(cb_counts[cb]),
          'std_amp': np.std(cb_counts[cb]),
          'total_counts': np.sum(cb_counts[cb]),
@@ -77,7 +78,7 @@ def create_per_cell_amp(bus: Bus):
 
 def plot_amplification(df_amp, label=None):
 
-    plt.scatter(df_amp['nUMIs'], df_amp['mean_amp'], s=1, alpha=0.5, label=label)
+    plt.scatter(df_amp['nUMI'], df_amp['mean_amp'], s=1, alpha=0.5, label=label)
 
     plt.xscale('log')
 #     plt.xlim(10,60000)
