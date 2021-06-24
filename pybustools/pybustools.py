@@ -1,6 +1,6 @@
-from pybustools import busio
 import pathlib
 import toolz
+from pybustools import busio
 
 
 class Bus():
@@ -66,7 +66,8 @@ def iterate_CB_UMI_of_busfile(fname, decode_seq=True):
     """
     iterates over CB/UMI entries, i.e. all entries with the same CB/UMI
     are emitted together.
-    ideally, there'd only be one entry per CB/UMI, but sometimes thers doublets
+    ideally, there'd only be one entry per CB/UMI, but sometimes thers doublets:
+    This happens when two reads have the same CB/UMI but map to different genes (ECs)
     """
     bus_iterator = busio.read_binary_bus(fname, decode_seq)
 

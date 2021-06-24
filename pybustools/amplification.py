@@ -1,9 +1,9 @@
-from pybustools.pybustools import Bus
 import collections
 import tqdm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from pybustools.pybustools import Bus
 
 
 """
@@ -49,7 +49,7 @@ def create_per_EC_amp(bus: Bus):
     def _h(x):
         genes = genes_for_ec(x)
         return list(genes)[0] if len(genes) == 1 else 'multiple'
-    df['the_gene'] = df.EC.apply(lambda x: _h(x))
+    df['the_gene'] = df.EC.apply(_h)
     return df
 
 

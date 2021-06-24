@@ -43,6 +43,17 @@ def test_decode_int_to_ACGT():
         busio._decode_int_to_ACGT(-1, seq_len=1)
 
 
+def test_encode_decode_ordering():
+    """
+    ensure that the alphabetical ordering of sequences is that same as he ordering
+    of their encodings
+    """
+    N = 8
+    decoded = [busio._decode_int_to_ACGT(encoding, N) for encoding in range(4**N)]
+    # since the encoding is sorted, so should be the decoding
+    assert decoded == sorted(decoded)
+
+
 def test_encode_decode():
     i = 4723452
     assert busio._encode_ACGT_to_int(busio._decode_int_to_ACGT(i, seq_len=13)) == i
