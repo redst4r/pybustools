@@ -1,9 +1,45 @@
-from scipy.stats import binom
 import collections
+import pandas as pd
+import toolz
+from scipy.stats import binom
 import tqdm
 import numpy as np
 from pybustools.pybustools import iterate_CB_UMI_of_busfile
-import pandas as pd
+from pybustools.busio import Bus_record
+
+# t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
+
+def collapsed_gene_busiterator(bus, ec2gene_dict, verbose=False):
+    """
+    iterating over a busfile, grouping CB/UMI and gene, i.e. all busrecords
+    matchibg the same CB/UMI and gene (EC point to the same gene)
+    """
+    discarded = 0
+    multimapped = 0
+    total = 0
+    for (cb, umi), record_list in iterate_CB_UMI_of_busfile(bus.bus_file):
+        total += 1
+        # whats the ECs and are they compatible with a single gene
+        # ecs can map to multiple genes
+        gene_sets = [set(ec2gene_dict[r.EC]) for r in record_list]
+        common_gene = set.intersection(*gene_sets)
+        if len(common_gene) == 0:
+            # no single gene that can explain it
+            discarded += 1
+            continue
+        elif len(common_gene) == 1:
+            counts = sum([r.COUNT for r in record_list])
+            common_gene = list(common_gene)[0]
+            yield Bus_record(cb, umi, common_gene, counts, record_list[0].FLAG)
+        else:
+            # more than one gene
+            multimapped += 1
+#             print(common_gene)
+        if total % 5_000_000 == 0 and verbose:
+            print(f'Total CB/UMI: {total}\nMultimapped: {multimapped} ({100*multimapped/total:.2f}%)\nDiscarded:{discarded} ({100*discarded/total:.2f}%)')
+
+    print(f'Total CB/UMI: {total}\nMultimapped: {multimapped} ({100*multimapped/total:.2f}%)\nDiscarded:{discarded} ({100*discarded/total:.2f}%)')
+
 
 def make_ec2gene_dict(bus, t2gfile):
     """
@@ -27,7 +63,7 @@ def make_ec2gene_dict(bus, t2gfile):
     return ec2gene
 
 
-def make_ec_histograms(bus):
+def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
     """
     for all ECs in the busfile create a CU-histogram (a histogram of the
     amplification, ie. number of reads per UMI)
@@ -36,18 +72,23 @@ def make_ec_histograms(bus):
     :returns: a dictionary of CU histograms (one item per EC)
     """
     ec_hists = {}
-    n_multimapped = 0
 
-    for (cb, umi), record_list in tqdm.tqdm(iterate_CB_UMI_of_busfile(bus.bus_file)):
-        if len(record_list) == 1:
-            r = record_list[0]
-            if r.EC in ec_hists:
-                ec_hists[r.EC][r.COUNT] += 1
-            else:
-                ec_hists[r.EC] = collections.defaultdict(int)
-                ec_hists[r.EC][r.COUNT] += 1
+    if collapse_EC:
+        assert t2gfile is not None
+        ec2g = make_ec2gene_dict(bus, t2gfile)
+        I = collapsed_gene_busiterator(bus, ec2g)
+    else:
+        I = iterate_CB_UMI_of_busfile(bus.bus_file)
+        # filtering records that map to more than one EC
+        # this is not totally correct (the two ECs might overlap in a single gene)
+        I = (record_list[0] for (cb, umi), record_list in I if len(record_list) == 1)
+
+    for r in tqdm.tqdm(I):
+        if r.EC in ec_hists:
+            ec_hists[r.EC][r.COUNT] += 1
         else:
-            n_multimapped += 1
+            ec_hists[r.EC] = collections.defaultdict(int)
+            ec_hists[r.EC][r.COUNT] += 1
     return ec_hists
 
 
