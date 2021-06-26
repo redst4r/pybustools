@@ -2,18 +2,19 @@ import pathlib
 import toolz
 from pybustools import busio
 
-
-class Bus():
-
-    def __init__(self, folder,
-                 bus_name='output.corrected.sort.bus',
-                 ec_name='matrix.ec',
-                 transcript_name='transcripts.txt',
+# TODO: multiple dispatch instead if inheritance?
+class _Bus():
+    """
+    Main class to represent a kallisto-Bus file and its associated metadata (EC and transcript files)
+    """
+    def __init__(self,
+                 bus_name,
+                 ec_name,
+                 transcript_name,
                  decode_seq=True):
-        self.folder = pathlib.Path(folder)
-        self.bus_file = self.folder / bus_name
-        self.ec_file = self.folder / ec_name
-        self.transcript_file = self.folder / transcript_name
+        self.bus_file = bus_name
+        self.ec_file = ec_name
+        self.transcript_file = transcript_name
         self.decode_seq = decode_seq
         self.ec_dict = busio.read_matrix_ec(self.ec_file)
         self.transcript_dict = busio.read_transcripts(self.transcript_file)
@@ -28,6 +29,25 @@ class Bus():
         "which transcript IDs correspond to the Equivalence class"
         transcripts = [self.transcript_dict[_] for _ in self.ec_dict[EC]]
         return transcripts
+
+class Bus(_Bus):
+    """
+    this is just a convenience wrapper around _Bus where we only specify
+    the bustools folder and it infers all the filenames
+    """
+    def __init__(self, folder,
+                 bus_name='output.corrected.sort.bus',
+                 ec_name='matrix.ec',
+                 transcript_name='transcripts.txt',
+                 decode_seq=True):
+
+        folder = pathlib.Path(folder)
+        super().__init__(
+            bus_name=folder / bus_name,
+            ec_name=folder / ec_name,
+            transcript_name=folder / transcript_name,
+            decode_seq=decode_seq
+        )
 
 
 def iterate_cells_of_busfile(fname, decode_seq=True):
