@@ -9,7 +9,7 @@ from pybustools.busio import Bus_record
 
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
 
-def collapsed_gene_busiterator(bus, ec2gene_dict, verbose=False):
+def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
     """
     iterating over a busfile, grouping CB/UMI and gene, i.e. all busrecords
     matchibg the same CB/UMI and gene (EC point to the same gene)
@@ -17,7 +17,7 @@ def collapsed_gene_busiterator(bus, ec2gene_dict, verbose=False):
     discarded = 0
     multimapped = 0
     total = 0
-    for (cb, umi), record_list in iterate_CB_UMI_of_busfile(bus.bus_file):
+    for (cb, umi), record_list in iterate_CB_UMI_of_busfile(bus_file):
         total += 1
         # whats the ECs and are they compatible with a single gene
         # ecs can map to multiple genes
@@ -76,7 +76,7 @@ def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
     if collapse_EC:
         assert t2gfile is not None
         ec2g = make_ec2gene_dict(bus, t2gfile)
-        I = collapsed_gene_busiterator(bus, ec2g)
+        I = collapsed_gene_busiterator(bus.bus_file, ec2g)
     else:
         I = iterate_CB_UMI_of_busfile(bus.bus_file)
         # filtering records that map to more than one EC
