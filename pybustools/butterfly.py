@@ -41,6 +41,13 @@ def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
     print(f'Total CB/UMI: {total}\nMultimapped: {multimapped} ({100*multimapped/total:.2f}%)\nDiscarded:{discarded} ({100*discarded/total:.2f}%)')
 
 
+def make_transcript2gene_df(t2gfile):
+    t2g_df = pd.read_csv(t2gfile,
+                         sep='\t', header=None,
+                         names=['transcript_id', 'gene_id', 'symbol'])
+    return t2g_df
+
+
 def make_ec2gene_dict(bus, t2gfile):
     """
     a dict mapping EC to a list of genes
@@ -48,9 +55,7 @@ def make_ec2gene_dict(bus, t2gfile):
     :params bus: a pybustools.Bus object
     :params t2gfile: filename of the transcript-to-gene mapping
     """
-    t2g_df = pd.read_csv(t2gfile,
-                         sep='\t', header=None,
-                         names=['transcript_id', 'gene_id', 'symbol'])
+    t2g_df = make_transcript2gene_df(t2gfile)
     t2g = {row['transcript_id']: row['symbol'] for _, row in t2g_df.iterrows()}
 
     def genes_for_ec(ec_id):
@@ -125,7 +130,7 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
     :returns: a dict which has the scaling factor for each gene/ec
     """
 
-    assert CPM in ['reads', 'umis'], "CPM must be either 'reads' or 'umis'"
+    assert CPM in ['reads', 'umis', 'raw'], "CPM must be either 'reads' or 'umis' or 'raw'"
     ecs = []
     counts_before = []
     counts_after = []
@@ -150,6 +155,13 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
         "how many UMIs  in total are in the CU histogram"
         return sum([freq for reads, freq in CU.items() if reads>0])
 
+
+    # # more elegant then the for loop abouve
+    # counts_before2 = toolz.valmap(numi_from_CU, old_CU_hist)
+    # counts_after2 = toolz.valmap(numi_from_CU, new_CU_hist)
+    # assert np.array([counts_before2[ec] for ec in ecs]) == counts_before
+    # assert np.array([counts_after2[ec] for ec in ecs]) == counts_after
+
     n_reads_before = sum(toolz.valmap(nreads_from_CU, old_CU_hist).values())
     n_reads_after  = sum(toolz.valmap(nreads_from_CU, new_CU_hist).values())
 
@@ -168,6 +180,9 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
     elif CPM == 'umis':
         before_cpm = n_umi_before
         after_cpm = n_umi_after
+    elif CPM == 'raw':
+        before_cpm = 1
+        after_cpm = 1
     else:
         raise ValueError(f'unknown CPM: {CPM}')
 
