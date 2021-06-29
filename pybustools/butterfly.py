@@ -194,6 +194,25 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
     return dict(zip(ecs, factor))
 
 
+
+import ot
+from scipy.spatial.distance import cdist
+def compare_histograms_OT(h1, h2):
+    """
+    optimal transport distance on the CU histograms. Better than KL since the
+    domains might not overlap!
+    """
+    x_min = np.minimum(min(h1.keys()), min(h2.keys()))
+    x_max = np.maximum(max(h1.keys()), max(h2.keys()))
+    xrange = np.arange(x_min, x_max)
+    M = cdist(xrange.reshape(-1,1), xrange.reshape(-1,1))
+
+    a = np.array([h1[x] for x in xrange])
+    b = np.array([h2[x] for x in xrange])
+    a = a/a.sum()
+    b = b/b.sum()
+    return ot.emd2(a, b, M)
+
 """
 ec2g = make_ec2gene_dict(bus, t2gfile)
 h = make_ec_histograms(bus)
