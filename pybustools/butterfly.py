@@ -6,8 +6,36 @@ import tqdm
 import numpy as np
 from pybustools.pybustools import iterate_CB_UMI_of_busfile
 from pybustools.busio import Bus_record
-
+import matplotlib.pyplot as plt
+import pandas as pd
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
+
+class CUHistogram():
+    """
+    Histogram of the Copies per UMI (CU) with some convenience functions
+    """
+    def __init__(self, CU_dict):
+        self.CU = CU_dict  # copies per UMI histogram
+
+    def get_nreads(self):
+        """
+        return the number of reads in the histogram
+        """
+        return sum([copies*freq for copies, freq in self.CU.items()])
+
+    def get_nUMI(self):
+        """
+        return the number of UMIs in the histogram
+        """
+        return sum([freq for copies, freq in self.CU.items() if copies > 0])
+
+    def toVectors(self):
+        """
+        return copies and frequencies as vectors
+        """
+        copies, freq = zip(*self.CU.items())
+        return np.array(copies), np.array(freq)
+
 
 def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
     """
@@ -227,6 +255,68 @@ def compare_histograms_OT(h1, h2):
     a = a/a.sum()
     b = b/b.sum()
     return ot.emd2(a, b, M)
+
+
+
+def plot_CU(CU, norm=True):
+    q = pd.Series(CU)
+
+    values = q.values
+    if norm:
+        values = values/values.sum()
+    ix = values!=0
+    plt.scatter(q.index[ix], values[ix])
+    plt.xlabel('Reads per UMI')
+    plt.ylabel('Fraction')
+
+
+def saturation_curve(CU_aggr):
+    down_percentages = np.linspace(0.01, 1, 20)
+    df_down2 = []
+    for f in tqdm.tqdm(down_percentages):
+        hdown = binomial_downsample(CU_histogram=CU_aggr, fraction=f)
+        n_reads = sum([k*v for k,v in hdown.items()])
+        n_umi = sum([v for k,v in hdown.items() if k > 0])
+        df_down2.append({
+            'n_reads': n_reads,
+            'n_umi': n_umi,
+            'f': f,
+        })
+    df_down2 = pd.DataFrame(df_down2)
+    return df_down2
+
+
+import multiprocessing as mp
+def _parralel_helper_saturation(gene, f, CU):
+    """
+    given a CU, downsample it to fraction f
+    gene is return to emulate a parallel dict.valmap
+    """
+    return gene, binomial_downsample(CU, fraction=f)
+
+def saturation_curve_per_gene(CU_dict, fractions=None, cores=1):
+    if fractions is None:
+        down_fractions = np.linspace(0.01,1,10)
+    else:
+        down_fractions = fractions
+    df_down = []
+    for f in tqdm.tqdm(down_fractions):
+    #     hdown = toolz.valmap(lambda CU: binomial_downsample(CU, fraction=f), h)
+
+        with mp.Pool(cores) as pool:
+            inputs = [(gene, f, CU) for gene,CU in CU_dict.items()]
+            hdown = pool.starmap(_parralel_helper_saturation, inputs)
+            hdown = dict(hdown)
+
+        n_reads = sum(toolz.valmap(lambda CU: sum([k*v for k,v in CU.items()]), hdown).values())
+        n_umi = sum(toolz.valmap(lambda CU: sum([v for k,v in CU.items() if k>0]), hdown).values())
+        df_down.append({
+            'n_reads': n_reads,
+            'n_umi': n_umi,
+            'f': f,
+        })
+    df_down = pd.DataFrame(df_down)
+    return df_down
 
 """
 ec2g = make_ec2gene_dict(bus, t2gfile)
