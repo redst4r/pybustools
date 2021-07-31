@@ -89,11 +89,11 @@ def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
         I = (record_list[0] for (cb, umi), record_list in I if len(record_list) == 1)
 
     for r in tqdm.tqdm(I):
-        if r.EC in ec_hists:
-            ec_hists[r.EC][r.COUNT] += 1
-        else:
+        if not r.EC in ec_hists:
             ec_hists[r.EC] = collections.defaultdict(int)
-            ec_hists[r.EC][r.COUNT] += 1
+
+        ec_hists[r.EC][r.COUNT] += 1
+    # ec_hists = toolz.valmap(lambda CU: CUHistogram(CU), ec_hists)
     return ec_hists
 
 
@@ -131,21 +131,6 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
     """
 
     assert CPM in ['reads', 'umis', 'raw'], "CPM must be either 'reads' or 'umis' or 'raw'"
-    ecs = []
-    counts_before = []
-    counts_after = []
-
-    # TODO this could be done more elegantly with toolz.valmap
-    for ec in tqdm.tqdm(old_CU_hist.keys()):
-        old_CU = old_CU_hist[ec]
-        new_CU = new_CU_hist[ec]
-        ecs.append(ec)
-        # how many UMIs survived the downsampling
-        counts_before.append(sum([freq for nreads, freq in old_CU.items() if nreads>0]))
-        counts_after.append(sum([freq for nreads, freq in new_CU.items() if nreads>0]))
-
-    counts_before = np.array(counts_before)
-    counts_after  = np.array(counts_after)
 
     def nreads_from_CU(CU):
         "how many reads in total are in the CU histogram"
@@ -155,10 +140,27 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
         "how many UMIs  in total are in the CU histogram"
         return sum([freq for reads, freq in CU.items() if reads>0])
 
+    ecs = []
+    counts_before = []
+    counts_after = []
+
+    # TODO this could be done more elegantly with toolz.valmap
+    for ec in tqdm.tqdm(old_CU_hist.keys()):
+        old_CU = old_CU_hist[ec]
+        new_CU = new_CU_hist[ec]
+        ecs.append(ec)
+
+        counts_before.append(numi_from_CU(old_CU))
+        counts_after.append(numi_from_CU(new_CU))
+
+    counts_before = np.array(counts_before)
+    counts_after  = np.array(counts_after)
 
     # # more elegant then the for loop abouve
     # counts_before2 = toolz.valmap(numi_from_CU, old_CU_hist)
     # counts_after2 = toolz.valmap(numi_from_CU, new_CU_hist)
+    # ecs = list(sorted(old_CU_hist.keys())
+
     # assert np.array([counts_before2[ec] for ec in ecs]) == counts_before
     # assert np.array([counts_after2[ec] for ec in ecs]) == counts_after
 
@@ -193,6 +195,19 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
 
     return dict(zip(ecs, factor))
 
+
+def aggregate_CUs(CU_dict):
+    """
+    aggregates (adds up) all the CU_dicts (each dict for a different gene) into a
+    single CU dict (agnostic of the gene). Useful for the sequencing depth saturation plots etc
+    """
+    def add_histograms(h1, h2):
+        # make sure they are defaultdicts
+        keys = set(h1.keys()) | set(h2.keys())
+        added = {k: h1[k]+h2[k] for k in keys}
+        return collections.defaultdict(int, added)
+    hall = toolz.reduce(add_histograms, CU_dict.values(), collections.defaultdict(int))
+    return hall
 
 
 import ot
