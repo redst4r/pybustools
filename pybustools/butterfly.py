@@ -168,41 +168,22 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
         "how many UMIs  in total are in the CU histogram"
         return sum([freq for reads, freq in CU.items() if reads>0])
 
-    ecs = []
-    counts_before = []
-    counts_after = []
+    # per gene/EC UMI counts
+    counts_before = toolz.valmap(numi_from_CU, old_CU_hist)
+    counts_after  = toolz.valmap(numi_from_CU, new_CU_hist)
+    ecs = list(sorted(old_CU_hist.keys()))
+    counts_before = np.array([counts_before[ec] for ec in ecs])
+    counts_after  = np.array([counts_after[ec]  for ec in ecs])
 
-    # TODO this could be done more elegantly with toolz.valmap
-    for ec in tqdm.tqdm(old_CU_hist.keys()):
-        old_CU = old_CU_hist[ec]
-        new_CU = new_CU_hist[ec]
-        ecs.append(ec)
-
-        counts_before.append(numi_from_CU(old_CU))
-        counts_after.append(numi_from_CU(new_CU))
-
-    counts_before = np.array(counts_before)
-    counts_after  = np.array(counts_after)
-
-    # # more elegant then the for loop abouve
-    # counts_before2 = toolz.valmap(numi_from_CU, old_CU_hist)
-    # counts_after2 = toolz.valmap(numi_from_CU, new_CU_hist)
-    # ecs = list(sorted(old_CU_hist.keys())
-
-    # assert np.array([counts_before2[ec] for ec in ecs]) == counts_before
-    # assert np.array([counts_after2[ec] for ec in ecs]) == counts_after
-
+    # reads across all genes
     n_reads_before = sum(toolz.valmap(nreads_from_CU, old_CU_hist).values())
     n_reads_after  = sum(toolz.valmap(nreads_from_CU, new_CU_hist).values())
 
-    n_umi_before = sum(toolz.valmap(numi_from_CU, old_CU_hist).values())
-    n_umi_after = sum(toolz.valmap(numi_from_CU, new_CU_hist).values())
+    n_umi_before = counts_before.sum()
+    n_umi_after = counts_after.sum()
 
-    assert counts_before.sum() == n_umi_before
-    assert int(counts_after.sum()) == int(n_umi_after)
-
-    print(f'UMIs: {n_umi_before} - {n_umi_after} ({100*n_umi_after/n_umi_before} %)')
-    print(f'Reads: {n_reads_before} - {n_reads_after} ({100*n_reads_after/n_reads_before} %)')
+    print(f'UMIs: {n_umi_before} - {n_umi_after} ({100*n_umi_after/n_umi_before:.3f} %)')
+    print(f'Reads: {n_reads_before} - {n_reads_after} ({100*n_reads_after/n_reads_before:.3f} %)')
 
     if CPM == 'reads':
         before_cpm = n_reads_before

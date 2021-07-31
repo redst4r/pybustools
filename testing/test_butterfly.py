@@ -55,6 +55,15 @@ def test_binomial_downsample_factors():
     assert butterfly.binomial_downsample_factors(old_hist, new_hist, CPM='reads') == {'gene1': 1.5}
 
 
+    # umi norm
+    old_hist = {'gene1': {1:10}}
+    new_hist = {'gene1': butterfly.binomial_downsample(old_hist['gene1'], 0.5)}
+    assert butterfly.binomial_downsample_factors(old_hist, new_hist, CPM='umis') == {'gene1': 1}
+
+    old_hist = {'gene1': {2:10}}
+    new_hist = {'gene1': butterfly.binomial_downsample(old_hist['gene1'], 0.5)}
+    assert butterfly.binomial_downsample_factors(old_hist, new_hist, CPM='umis') == {'gene1': 1.}
+
 @pytest.fixture
 def ec_matrix_file():
     "creates an ec_file with 10 entries"
