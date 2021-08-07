@@ -91,8 +91,8 @@ def read_binary_bus(fname, decode_seq:bool=True, buffersize=20000, verbose=False
                 if decode_seq:
                     cb = _decode_int_to_ACGT(cb, cb_len)
                     umi = _decode_int_to_ACGT(umi, umi_len)
-            
-                # Here's a slight speed improvement: 
+
+                # Here's a slight speed improvement:
                 # just create the namedtuple without keyword args makes it quite a bit faster
                 # for 100000 records:
                 # keyworkds:   ~65ms
@@ -131,6 +131,39 @@ def read_transcripts(fname):
     return D
 
 
+def _write_header(fh, cb_length, umi_length):
+    """
+    writes the header of a busfile into an opened filehandle
+    """
+    fre_header = 'my_bus'
+    tlen = len(fre_header)
+    header_bytes = struct.pack('4sIIII', b'BUS\x00', 1, cb_length, umi_length, tlen)
+    free_header_bytes = struct.pack(f'{tlen}s', fre_header.encode())
+
+    fh.write(header_bytes)
+    fh.write(free_header_bytes)
+
+
+def _write_record(record, fh, cb_length, umi_length):
+    """
+    write a single BUS record into a open filehandle
+    """
+    cb, umi, ec, count, flags = record
+    # if the records have strings for CB/UMI, encode them into ints
+    if isinstance(cb, str) and isinstance(umi, str):
+        assert len(cb) == cb_length
+        assert len(umi) == umi_length
+        cb = _encode_ACGT_to_int(cb)
+        umi = _encode_ACGT_to_int(umi)
+    elif isinstance(cb, int) and isinstance(umi, int):
+        pass
+    else:
+        raise ValueError('CB/UMI must be both str or both int')
+
+    bytes_record = struct.pack('QQiIIxxxx', cb, umi, ec, count, flags)
+    fh.write(bytes_record)
+
+
 def write_busfile(fname, bus_records:list, cb_length, umi_length):
     """
     write bus_records to disk.
@@ -138,29 +171,10 @@ def write_busfile(fname, bus_records:list, cb_length, umi_length):
     them if needed
     """
     with open(fname, 'wb') as fh:
-        fre_header = 'my_bus'
-        tlen = len(fre_header)
-        header_bytes = struct.pack('4sIIII', b'BUS\x00', 1, cb_length, umi_length, tlen)
-        free_header_bytes = struct.pack(f'{tlen}s', fre_header.encode())
-
-        fh.write(header_bytes)
-        fh.write(free_header_bytes)
+        _write_header(fh, cb_length, umi_length)
 
         for record in bus_records:
-            cb, umi, ec, count, flags = record
-            # if the records have strings for CB/UMI, encode them into ints
-            if isinstance(cb, str) and isinstance(umi, str):
-                assert len(cb) == cb_length
-                assert len(umi) == umi_length
-                cb = _encode_ACGT_to_int(cb)
-                umi = _encode_ACGT_to_int(umi)
-            elif isinstance(cb, int) and isinstance(umi, int):
-                pass
-            else:
-                raise ValueError('CB/UMI must be both str or both int')
-
-            bytes_record = struct.pack('QQiIIxxxx', cb, umi, ec, count, flags)
-            fh.write(bytes_record)
+            _write_record(record, fh, cb_length, umi_length)
 
 
 if __name__ == '__main__':
