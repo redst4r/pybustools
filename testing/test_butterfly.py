@@ -3,7 +3,7 @@ import pytest
 from pybustools.pybustools import _Bus
 from pybustools import busio
 from pybustools import butterfly
-
+import numpy as np
 
 def test_make_ec_histograms(tmp_path, ec_matrix_file, transcript_file):
     records = [
@@ -30,6 +30,11 @@ def test_make_ec_histograms(tmp_path, ec_matrix_file, transcript_file):
         2: {1:2},
     }
 
+def _assert_dict_eq(d1, d2):
+    assert d1.keys() == d2.keys()
+    for k in d1.keys():
+        np.testing.assert_almost_equal(d1[k], d2[k])
+
 
 def test_binomial_downsample():
     CUhist = {
@@ -37,11 +42,41 @@ def test_binomial_downsample():
         }
     assert butterfly.binomial_downsample(CUhist, 0.5) == {0:5, 1:5}
 
+    # =======================================================================
     CUhist = {
-        2: 16,  # 15 molecules with two reads
+        2: 16,  # 16 molecules with two reads
         }
-    assert butterfly.binomial_downsample(CUhist, 0.5) == {0:4, 1:8, 2:4}
+    # assert butterfly.binomial_downsample(CUhist, 0.5) ==
+    _assert_dict_eq(butterfly.binomial_downsample(CUhist, 0.5),
+                    {0:4, 1:8, 2:4})
 
+    # =======================================================================
+    CUhist = {
+        1: 4,
+        2: 16,  # 15 molecules with two reads
+        4: 20,  # 20 molecules with four reads
+    }
+
+    _assert_dict_eq(butterfly.binomial_downsample(CUhist, 0.5),
+                    {0: 7.25, 1: 15, 2: 11.5, 3: 5, 4: 1.25})
+
+
+def test_binomial_downsample_all_genes():
+    CUhist1 = {
+        1: 10,  # 10 molecules with single read
+        }
+    CUhist2 = {
+        2: 16,  # 16 molecules with two reads
+        }
+    d = {
+        'gene1': CUhist1,
+        'gene2': CUhist2
+    }
+    R = butterfly.binomial_downsample_all_genes(d, 0.5)
+
+    R_expected = {g: butterfly.binomial_downsample(d[g], 0.5) for g in d.keys()}
+
+    assert R == R_expected
 
 def test_binomial_downsample_factors():
     # a simple amplificifaation that is strictly 1:1
