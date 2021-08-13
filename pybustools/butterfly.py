@@ -125,6 +125,33 @@ def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
     return ec_hists
 
 
+def binomial_downsample_all_genes(CU_histogram_dict, fraction):
+    """
+    instead of doing it gene by gene [as binomial_downsample()] do it for
+    all genes at once. should be faster!
+    """
+
+    jmax_per_gene = toolz.valmap(lambda CU_hist:  np.max(list(CU_hist.keys())), CU_histogram_dict)
+    jmax = np.max(list(jmax_per_gene.values()))
+
+    j = np.arange(jmax+1)
+
+    # precalculate this binomial distribution for the various values of n
+    binomial_vector = {i: binom.pmf(k=j, n=i, p=fraction) for i in range(jmax+1)}
+
+    downsampled_dict = {}  # TODO toolz.valmap instead
+    for gene, CU_histogram in CU_histogram_dict.items():
+        hnew = np.zeros(jmax+1)
+        for i, hi in CU_histogram.items():
+            _t2 = binomial_vector[i] * hi
+            hnew = hnew + _t2
+        res = dict(zip(j, hnew))
+
+        # sometimes values are 0, these are useless so filter
+        res = toolz.valfilter(lambda v: v != 0, res)
+        downsampled_dict[gene] = res
+    return downsampled_dict
+
 def binomial_downsample(CU_histogram, fraction):
     """
     given a histogram of counts per UMI for a particular gene
