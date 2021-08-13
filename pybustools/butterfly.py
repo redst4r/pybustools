@@ -15,26 +15,34 @@ class CUHistogram():
     Histogram of the Copies per UMI (CU) with some convenience functions
     """
     def __init__(self, CU_dict):
-        self.CU = CU_dict  # copies per UMI histogram
+        self.histogram = CU_dict  # copies per UMI histogram
 
     def get_nreads(self):
         """
         return the number of reads in the histogram
         """
-        return sum([copies*freq for copies, freq in self.CU.items()])
+        return sum([copies*freq for copies, freq in self.histogram.items()])
 
     def get_nUMI(self):
         """
         return the number of UMIs in the histogram
         """
-        return sum([freq for copies, freq in self.CU.items() if copies > 0])
+        return sum([freq for copies, freq in self.histogram.items() if copies > 0])
 
     def toVectors(self):
         """
         return copies and frequencies as vectors
         """
-        copies, freq = zip(*self.CU.items())
+        copies, freq = zip(*self.histogram.items())
         return np.array(copies), np.array(freq)
+
+    def FSCM(self):
+        """
+        return fraction of single copy molecules
+        """
+        n1 = self.histogram[1]
+        nTotal = [freq for copies, freq in self.histogram.items() if copies>0]
+        return n1/nTotal
 
 
 def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
@@ -152,22 +160,22 @@ def binomial_downsample_all_genes(CU_histogram_dict, fraction):
         downsampled_dict[gene] = res
     return downsampled_dict
 
-def binomial_downsample(CU_histogram, fraction):
+def binomial_downsample(CU, fraction):
     """
     given a histogram of counts per UMI for a particular gene
     calculate the histogram after downsampling the reads to `fraction`
 
-    :params CU_histogram: a histogram (dictionary of amplification -> frequecny)
+    :params CU: a histogram (dictionary of amplification -> frequecny)
     :params fraction: fraction of reads to downsample to
 
     :returns: another CU histrogram, downsampled accordingly
     """
-    jmax = np.max(list(CU_histogram.keys()))
+    jmax = np.max(list(CU.keys()))
 
     hnew = np.zeros(jmax+1)
     j = np.arange(jmax+1)
 
-    for i, hi in CU_histogram.items():
+    for i, hi in CU.items():
         _t = binom.pmf(k=j, n=i, p=fraction) * hi
         hnew = hnew + _t
     return dict(zip(j, hnew))
@@ -237,7 +245,7 @@ def aggregate_CUs(CU_dict):
     aggregates (adds up) all the CU_dicts (each dict for a different gene) into a
     single CU dict (agnostic of the gene). Useful for the sequencing depth saturation plots etc
     """
-    def add_histograms(h1, h2):
+    def add_histograms(h1:dict, h2:dict):
         # make sure they are defaultdicts
         keys = set(h1.keys()) | set(h2.keys())
         added = {k: h1[k]+h2[k] for k in keys}
@@ -246,9 +254,9 @@ def aggregate_CUs(CU_dict):
     return hall
 
 
-import ot
 from scipy.spatial.distance import cdist
 def compare_histograms_OT(h1, h2):
+    import ot
     """
     optimal transport distance on the CU histograms. Better than KL since the
     domains might not overlap!
@@ -278,8 +286,8 @@ def plot_CU(CU, norm=True):
     plt.ylabel('Fraction')
 
 
-def saturation_curve(CU_aggr):
-    down_percentages = np.linspace(0.01, 1, 20)
+def saturation_curve(CU_aggr, bins=20):
+    down_percentages = np.linspace(0.01, 1, bins)
     df_down2 = []
     for f in tqdm.tqdm(down_percentages):
         hdown = binomial_downsample(CU_histogram=CU_aggr, fraction=f)
