@@ -4,10 +4,9 @@ import toolz
 from scipy.stats import binom
 import tqdm
 import numpy as np
+import matplotlib.pyplot as plt
 from pybustools.pybustools import iterate_CB_UMI_of_busfile
 from pybustools.busio import Bus_record
-import matplotlib.pyplot as plt
-import pandas as pd
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
 
 class CUHistogram():
@@ -62,7 +61,6 @@ def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
         if len(common_gene) == 0:
             # no single gene that can explain it
             discarded += 1
-            continue
         elif len(common_gene) == 1:
             counts = sum([r.COUNT for r in record_list])
             common_gene = list(common_gene)[0]
@@ -129,7 +127,6 @@ def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
             ec_hists[r.EC] = collections.defaultdict(int)
 
         ec_hists[r.EC][r.COUNT] += 1
-    # ec_hists = toolz.valmap(lambda CU: CUHistogram(CU), ec_hists)
     return ec_hists
 
 
@@ -139,7 +136,7 @@ def binomial_downsample_all_genes(CU_histogram_dict, fraction):
     all genes at once. should be faster!
     """
 
-    jmax_per_gene = toolz.valmap(lambda CU_hist:  np.max(list(CU_hist.keys())), CU_histogram_dict)
+    jmax_per_gene = toolz.valmap(lambda CU_hist: np.max(list(CU_hist.keys())), CU_histogram_dict)
     jmax = np.max(list(jmax_per_gene.values()))
 
     j = np.arange(jmax+1)
@@ -245,12 +242,7 @@ def aggregate_CUs(CU_dict):
     aggregates (adds up) all the CU_dicts (each dict for a different gene) into a
     single CU dict (agnostic of the gene). Useful for the sequencing depth saturation plots etc
     """
-    def add_histograms(h1:dict, h2:dict):
-        # make sure they are defaultdicts
-        keys = set(h1.keys()) | set(h2.keys())
-        added = {k: h1[k]+h2[k] for k in keys}
-        return collections.defaultdict(int, added)
-    hall = toolz.reduce(add_histograms, CU_dict.values(), collections.defaultdict(int))
+    hall = toolz.merge_with(sum, CU_dict.values())
     return hall
 
 
@@ -290,7 +282,7 @@ def saturation_curve(CU_aggr, bins=20):
     down_percentages = np.linspace(0.01, 1, bins)
     df_down2 = []
     for f in tqdm.tqdm(down_percentages):
-        hdown = binomial_downsample(CU_histogram=CU_aggr, fraction=f)
+        hdown = binomial_downsample(CU_aggr, fraction=f)
         n_reads = sum([k*v for k,v in hdown.items()])
         n_umi = sum([v for k,v in hdown.items() if k > 0])
         df_down2.append({
