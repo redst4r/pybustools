@@ -242,15 +242,9 @@ def aggregate_CUs(CU_dict):
     aggregates (adds up) all the CU_dicts (each dict for a different gene) into a
     single CU dict (agnostic of the gene). Useful for the sequencing depth saturation plots etc
     """
-    def add_histograms(h1: dict, h2: dict):
-        # make sure they are defaultdicts
-        keys = set(h1.keys()) | set(h2.keys())
-        added = {k: h1[k]+h2[k] for k in keys}
-        return collections.defaultdict(int, added)
-
     histograms = (h.histogram for h in CU_dict.values())  # generator to save mem
-    hall = toolz.reduce(add_histograms, histograms, collections.defaultdict(int))
-    return CUHistogram(dict(hall))   # turn the defaultdict into dict just to be sure
+    hall = toolz.merge_with(sum, histograms)
+    return CUHistogram(hall)
 
 
 from scipy.spatial.distance import cdist
