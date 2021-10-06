@@ -248,7 +248,7 @@ def aggregate_CUs(CU_dict):
         added = {k: h1[k]+h2[k] for k in keys}
         return collections.defaultdict(int, added)
 
-    histograms = [h.histogram for h in CU_dict.values()]
+    histograms = (h.histogram for h in CU_dict.values())  # generator to save mem
     hall = toolz.reduce(add_histograms, histograms, collections.defaultdict(int))
     return CUHistogram(dict(hall))   # turn the defaultdict into dict just to be sure
 
