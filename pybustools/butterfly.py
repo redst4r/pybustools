@@ -42,7 +42,7 @@ class CUHistogram():
         return fraction of single copy molecules
         """
         n1 = self.histogram[1]
-        nTotal = [freq for copies, freq in self.histogram.items() if copies>0]
+        nTotal = self.get_nUMI()
         return n1/nTotal
 
     def __eq__(self, other):
@@ -266,9 +266,8 @@ def compare_histograms_OT(h1, h2):
     return ot.emd2(a, b, M)
 
 
-
 def plot_CU(CU, norm=True):
-    q = pd.Series(CU)
+    q = pd.Series(CU.histogram).sort_index()
 
     values = q.values
     if norm:
@@ -302,6 +301,7 @@ def _parralel_helper_saturation(gene, f, CU):
     gene is return to emulate a parallel dict.valmap
     """
     return gene, binomial_downsample(CU, fraction=f)
+
 
 def saturation_curve_per_gene(CU_dict, fractions=None, cores=1):
     if fractions is None:
