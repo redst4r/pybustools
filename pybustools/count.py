@@ -83,7 +83,7 @@ def kallisto_count(bus: Bus, t2g_file):
     X = _list_of_expression_vectors_to_matrix(expressionvectors, all_genes)
     adata = sc.AnnData(
         X,
-        bs=pd.DataFrame(cbs, columns=['CB']).set_index('CB'),
+        obs=pd.DataFrame(cbs, columns=['CB']).set_index('CB'),
         var=pd.DataFrame(all_genes, columns=['var_index']).set_index('var_index'))
 
     print('multimapped', n_multimapped)
