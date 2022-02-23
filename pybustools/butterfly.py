@@ -5,7 +5,7 @@ from scipy.stats import binom
 import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from pybustools.pybustools import iterate_CB_UMI_of_busfile
+from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus
 from pybustools.busio import Bus_record
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
 
@@ -44,7 +44,7 @@ class CUHistogram():
         return n1/nTotal
 
 
-def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
+def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
     """
     iterating over a busfile, grouping CB/UMI and gene, i.e. all busrecords
     matchibg the same CB/UMI and gene (EC point to the same gene)
@@ -75,21 +75,21 @@ def collapsed_gene_busiterator(bus_file, ec2gene_dict, verbose=False):
     print(f'Total CB/UMI: {total}\nMultimapped: {multimapped} ({100*multimapped/total:.2f}%)\nDiscarded:{discarded} ({100*discarded/total:.2f}%)')
 
 
-def make_transcript2gene_df(t2gfile):
+def _make_transcript2gene_df(t2gfile: str):
     t2g_df = pd.read_csv(t2gfile,
                          sep='\t', header=None,
                          names=['transcript_id', 'gene_id', 'symbol'])
     return t2g_df
 
 
-def make_ec2gene_dict(bus, t2gfile):
+def _make_ec2gene_dict(bus: Bus, t2gfile):
     """
     a dict mapping EC to a list of genes
 
     :params bus: a pybustools.Bus object
     :params t2gfile: filename of the transcript-to-gene mapping
     """
-    t2g_df = make_transcript2gene_df(t2gfile)
+    t2g_df = _make_transcript2gene_df(t2gfile)
     t2g = {row['transcript_id']: row['symbol'] for _, row in t2g_df.iterrows()}
 
     def genes_for_ec(ec_id):
@@ -102,7 +102,7 @@ def make_ec2gene_dict(bus, t2gfile):
     return ec2gene
 
 
-def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
+def make_ec_histograms(bus: Bus, collapse_EC=False, t2gfile=None):
     """
     for all ECs in the busfile create a CU-histogram (a histogram of the
     amplification, ie. number of reads per UMI)
@@ -114,8 +114,8 @@ def make_ec_histograms(bus, collapse_EC=False, t2gfile=None):
 
     if collapse_EC:
         assert t2gfile is not None
-        ec2g = make_ec2gene_dict(bus, t2gfile)
-        I = collapsed_gene_busiterator(bus.bus_file, ec2g)
+        ec2g = _make_ec2gene_dict(bus, t2gfile)
+        I = _collapsed_gene_busiterator(bus.bus_file, ec2g)
     else:
         I = iterate_CB_UMI_of_busfile(bus.bus_file)
         # filtering records that map to more than one EC
@@ -327,7 +327,7 @@ def saturation_curve_per_gene(CU_dict, fractions=None, cores=1):
     return df_down
 
 """
-ec2g = make_ec2gene_dict(bus, t2gfile)
+ec2g = _make_ec2gene_dict(bus, t2gfile)
 h = make_ec_histograms(bus)
 
 import toolz
