@@ -12,6 +12,8 @@ from pybustools.busio import Bus_record
 class CUHistogram():
     """
     Histogram of the Copies per UMI (CU) with some convenience functions
+
+    dictionary of amplification -> frequecny
     """
     def __init__(self, CU_dict):
         self.histogram = CU_dict  # copies per UMI histogram
@@ -40,9 +42,14 @@ class CUHistogram():
         return fraction of single copy molecules
         """
         n1 = self.histogram[1]
-        nTotal = [freq for copies, freq in self.histogram.items() if copies>0]
+        nTotal = self.get_nUMI()
         return n1/nTotal
 
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(other, CUHistogram):
+            return self.histogram == other.histogram
+        return False
 
 def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
     """
@@ -63,7 +70,7 @@ def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
             discarded += 1
         elif len(common_gene) == 1:
             counts = sum([r.COUNT for r in record_list])
-            common_gene = list(common_gene)[0]
+            common_gene = common_gene.pop()  # get the single element of the set
             yield Bus_record(cb, umi, common_gene, counts, record_list[0].FLAG)
         else:
             # more than one gene
@@ -127,6 +134,7 @@ def make_ec_histograms(bus: Bus, collapse_EC=False, t2gfile=None):
             ec_hists[r.EC] = collections.defaultdict(int)
 
         ec_hists[r.EC][r.COUNT] += 1
+    ec_hists = toolz.valmap(CUHistogram, ec_hists)  # turn into class
     return ec_hists
 
 
@@ -136,7 +144,7 @@ def binomial_downsample_all_genes(CU_histogram_dict, fraction):
     all genes at once. should be faster!
     """
 
-    jmax_per_gene = toolz.valmap(lambda CU_hist: np.max(list(CU_hist.keys())), CU_histogram_dict)
+    jmax_per_gene = toolz.valmap(lambda CU_hist: np.max(list(CU_hist.histogram.keys())), CU_histogram_dict)
     jmax = np.max(list(jmax_per_gene.values()))
 
     j = np.arange(jmax+1)
@@ -147,17 +155,17 @@ def binomial_downsample_all_genes(CU_histogram_dict, fraction):
     downsampled_dict = {}  # TODO toolz.valmap instead
     for gene, CU_histogram in CU_histogram_dict.items():
         hnew = np.zeros(jmax+1)
-        for i, hi in CU_histogram.items():
+        for i, hi in CU_histogram.histogram.items():
             _t2 = binomial_vector[i] * hi
             hnew = hnew + _t2
         res = dict(zip(j, hnew))
 
         # sometimes values are 0, these are useless so filter
         res = toolz.valfilter(lambda v: v != 0, res)
-        downsampled_dict[gene] = res
+        downsampled_dict[gene] = CUHistogram(res)
     return downsampled_dict
 
-def binomial_downsample(CU, fraction):
+def binomial_downsample(CU: CUHistogram, fraction):
     """
     given a histogram of counts per UMI for a particular gene
     calculate the histogram after downsampling the reads to `fraction`
@@ -167,15 +175,15 @@ def binomial_downsample(CU, fraction):
 
     :returns: another CU histrogram, downsampled accordingly
     """
-    jmax = np.max(list(CU.keys()))
+    jmax = np.max(list(CU.histogram.keys()))
 
     hnew = np.zeros(jmax+1)
     j = np.arange(jmax+1)
 
-    for i, hi in CU.items():
+    for i, hi in CU.histogram.items():
         _t = binom.pmf(k=j, n=i, p=fraction) * hi
         hnew = hnew + _t
-    return dict(zip(j, hnew))
+    return CUHistogram(dict(zip(j, hnew)))
 
 
 def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
@@ -192,24 +200,16 @@ def binomial_downsample_factors(old_CU_hist, new_CU_hist, CPM='reads'):
 
     assert CPM in ['reads', 'umis', 'raw'], "CPM must be either 'reads' or 'umis' or 'raw'"
 
-    def nreads_from_CU(CU):
-        "how many reads in total are in the CU histogram"
-        return sum([freq*reads for reads, freq in CU.items()])
-
-    def numi_from_CU(CU):
-        "how many UMIs  in total are in the CU histogram"
-        return sum([freq for reads, freq in CU.items() if reads>0])
-
     # per gene/EC UMI counts
-    counts_before = toolz.valmap(numi_from_CU, old_CU_hist)
-    counts_after  = toolz.valmap(numi_from_CU, new_CU_hist)
+    counts_before = toolz.valmap(lambda CU: CU.get_nUMI(), old_CU_hist)
+    counts_after  = toolz.valmap(lambda CU: CU.get_nUMI(), new_CU_hist)
     ecs = list(sorted(old_CU_hist.keys()))
     counts_before = np.array([counts_before[ec] for ec in ecs])
     counts_after  = np.array([counts_after[ec]  for ec in ecs])
 
     # reads across all genes
-    n_reads_before = sum(toolz.valmap(nreads_from_CU, old_CU_hist).values())
-    n_reads_after  = sum(toolz.valmap(nreads_from_CU, new_CU_hist).values())
+    n_reads_before = sum(toolz.valmap(lambda CU: CU.get_nreads(), old_CU_hist).values())
+    n_reads_after  = sum(toolz.valmap(lambda CU: CU.get_nreads(), new_CU_hist).values())
 
     n_umi_before = counts_before.sum()
     n_umi_after = counts_after.sum()
@@ -242,8 +242,9 @@ def aggregate_CUs(CU_dict):
     aggregates (adds up) all the CU_dicts (each dict for a different gene) into a
     single CU dict (agnostic of the gene). Useful for the sequencing depth saturation plots etc
     """
-    hall = toolz.merge_with(sum, CU_dict.values())
-    return hall
+    histograms = (h.histogram for h in CU_dict.values())  # generator to save mem
+    hall = toolz.merge_with(sum, histograms)
+    return CUHistogram(hall)
 
 
 from scipy.spatial.distance import cdist
@@ -265,9 +266,8 @@ def compare_histograms_OT(h1, h2):
     return ot.emd2(a, b, M)
 
 
-
 def plot_CU(CU, norm=True):
-    q = pd.Series(CU)
+    q = pd.Series(CU.histogram).sort_index()
 
     values = q.values
     if norm:
@@ -282,9 +282,9 @@ def saturation_curve(CU_aggr, bins=20):
     down_percentages = np.linspace(0.01, 1, bins)
     df_down2 = []
     for f in tqdm.tqdm(down_percentages):
-        hdown = binomial_downsample(CU_aggr, fraction=f)
-        n_reads = sum([k*v for k,v in hdown.items()])
-        n_umi = sum([v for k,v in hdown.items() if k > 0])
+        hdown = binomial_downsample(CU=CU_aggr, fraction=f)
+        n_reads = hdown.get_nreads()# sum([k*v for k,v in hdown.items()])
+        n_umi = hdown.get_nUMI()# sum([v for k,v in hdown.items() if k > 0])
         df_down2.append({
             'n_reads': n_reads,
             'n_umi': n_umi,
@@ -301,6 +301,7 @@ def _parralel_helper_saturation(gene, f, CU):
     gene is return to emulate a parallel dict.valmap
     """
     return gene, binomial_downsample(CU, fraction=f)
+
 
 def saturation_curve_per_gene(CU_dict, fractions=None, cores=1):
     if fractions is None:
