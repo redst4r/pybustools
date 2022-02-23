@@ -7,6 +7,7 @@ class _Bus():
     """
     Main class to represent a kallisto-Bus file and its associated metadata (EC and transcript files)
     """
+
     def __init__(self,
                  bus_name,
                  ec_name,
@@ -30,11 +31,13 @@ class _Bus():
         transcripts = [self.transcript_dict[_] for _ in self.ec_dict[EC]]
         return transcripts
 
+
 class Bus(_Bus):
     """
     this is just a convenience wrapper around _Bus where we only specify
     the bustools folder and it infers all the filenames
     """
+
     def __init__(self, folder,
                  bus_name='output.corrected.sort.bus',
                  ec_name='matrix.ec',
@@ -178,17 +181,24 @@ def merge_iterators(dict_of_iterators):
             break
 
 
-def iterate_bus_cells_umi_multiple(names, fname_list, decode_seq=True):
+def iterate_bus_cells_umi_multiple(fname_dict: dict, decode_seq=True):
+    """
+    simultaniously iterating multiple busfiles, yielding groups of
+    records with the same CB/UMI in the busfiles
 
+    :param bus_dict: a dictionary of name->bus_filename. Each entry is one busfile to be iterated. Names can be arbitrary, but will be used in the yielded results
+    :param decode_seq: if True, decodes the int represnetation of the CB/UMI into bases
+    :return: yields (cb, umi) and a info_dict (name->list[records])
+    """
     # a dict of all the busfile-iterators
     iterators = {n: iterate_CB_UMI_of_busfile(fname, decode_seq)
-                 for n, fname in zip(names, fname_list)}
+                 for n, fname in fname_dict.items()}
 
     for (cb, umi), info in merge_iterators(iterators):
         yield (cb, umi), info
 
 
-def iterate_bus_cells_multiple(names, fname_list, decode_seq=True):
+def iterate_bus_cells_multiple(fname_dict: dict, decode_seq=True):
     """
     iterates over multiple busfiles, emitting an entries grouped by CB:
     If a CB is present in multiple bus-files, this will yield:
@@ -201,7 +211,7 @@ def iterate_bus_cells_multiple(names, fname_list, decode_seq=True):
 
     # a dict of all the busfile-iterators
     iterators = {n: iterate_cells_of_busfile(fname, decode_seq)
-                 for n, fname in zip(names, fname_list)}
+                 for n, fname in fname_dict.items()}
 
     for cb, info in merge_iterators(iterators):
         yield cb, info
