@@ -1,6 +1,6 @@
 import numpy as np
 from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_header_info
-from pybustools.pybustools import iterate_CB_UMI_of_busfile
+from pybustools.pybustools import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile
 import tqdm
 import os
 import shutil
@@ -107,6 +107,35 @@ def subsample_busfile(fname_in, fname_out, fraction):
     # we need to write the correct header
     _, cb_len, umi_len, _ = get_header_info(fname_in)
     write_busfile(fname_out, G, cb_length=cb_len, umi_length=umi_len)
+
+
+def subsample_busfile_cb_umi_generator(fname, fraction):
+    """
+    returns a generator across cb/umi but subsampled the reads (not the records!)
+    essentially, eaech record is binomially subsampled. If it still has counts, its yieled
+    """
+    for (cb, umi), records in iterate_CB_UMI_of_busfile(fname, decode_seq=False):
+        for r in records:
+            c = np.random.binomial(r.COUNT, fraction)
+            if c > 0:
+                yield Bus_record(cb, umi, r.EC, c, r.FLAG)
+
+
+def subsample_busfile_cb_generator(fname, fraction):
+    """
+    returns a generator across cb but subsampled the reads (not the records!)
+    essentially, eaech record is binomially subsampled. If it still has counts, its yieled
+    """
+    for cb, records in iterate_cells_of_busfile(fname, decode_seq=False):
+        subsampled_records = []
+        for r in records:
+            c = np.random.binomial(r.COUNT, fraction)
+            if c > 0:
+                subsampled_records.append(
+                    Bus_record(cb, r.UMI, r.EC, c, r.FLAG)
+                    )
+        if len(subsampled_records) > 0:
+            yield cb, subsampled_records
 
 
 @numba.njit(cache=True)
