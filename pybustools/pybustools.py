@@ -53,6 +53,27 @@ class Bus(_Bus):
         )
 
 
+def records_to_gene(records, ec2g):
+    """
+    is there one or more genes that are consistent across all the records of this CB/UMI
+    returns the set of genes that are shared by all the records
+
+    :param records: list of BusRecords, usually from a single CB/UMI
+    :param ec2g: a dictionary mapping each EC to a set of genes
+    """
+    if len(records) == 1:
+        return ec2g[records[0].EC]
+
+    genes_per_record = []
+    for r in records:
+        gset = ec2g[r.EC]
+        genes_per_record.append(gset)
+
+    # si there an intersection?
+    intersect = set.intersection(*genes_per_record)
+    return intersect
+
+
 def iterate_cells_of_busfile(fname, decode_seq=True):
     """
     runs over the !!!SORTED!!! busfile, collecting all entries for a single CB
