@@ -121,3 +121,26 @@ def test_iterate_cells_UMI_raise_unsorted(tmp_path):
     with pytest.raises(ValueError):
         gen = pybustools.iterate_CB_UMI_of_busfile(fname)
         list(gen)
+
+
+def test_records_to_genes():
+
+    ec2gene = {
+        0: ['A','B'],
+        1: ['B'],
+        2: ['A'],
+        3: ['C'],
+    }
+
+    records = [
+        busio.Bus_record('TTAT', 'TAT', 0, 250, 13),  # maps to A,B
+        busio.Bus_record('TTAT', 'TAT', 1, 250, 13),  # maps to B
+    ]
+    assert pybustools.records_to_gene(records, ec2gene) == list('B')
+
+    # incompatible records
+    records = [
+        busio.Bus_record('TTAT', 'TAT', 0, 250, 13),  # maps to A,B
+        busio.Bus_record('TTAT', 'TAT', 3, 250, 13),  # maps to C
+    ]
+    assert pybustools.records_to_gene(records, ec2gene) == list()

@@ -59,19 +59,24 @@ def records_to_gene(records, ec2g):
     returns the set of genes that are shared by all the records
 
     :param records: list of BusRecords, usually from a single CB/UMI
-    :param ec2g: a dictionary mapping each EC to a set of genes
+    :param ec2g: a dictionary mapping each EC to a list of genes
+
+    :returns: a list of genes that are compatible with the records (i.e. each record supports all those genes)
     """
     if len(records) == 1:
-        return ec2g[records[0].EC]
+        genelist = ec2g[records[0].EC]
+        assert isinstance(genelist, list), "ec2g didnt return a list"
+        return genelist
 
     genes_per_record = []
     for r in records:
-        gset = ec2g[r.EC]
-        genes_per_record.append(gset)
+        genelist = ec2g[r.EC]
+        assert isinstance(genelist, list), "ec2g didnt return a list"
+        genes_per_record.append(set(genelist))
 
     # si there an intersection?
     intersect = set.intersection(*genes_per_record)
-    return intersect
+    return list(intersect)
 
 
 def iterate_cells_of_busfile(fname, decode_seq=True):
