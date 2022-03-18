@@ -6,17 +6,7 @@ from scipy.sparse import csr_matrix
 from pybustools.pybustools import Bus
 import tqdm
 from sctools.kallisto import annotate_gene_symbols
-
-
-def read_t2g(t2g_file):
-    """
-    reading the kallisto trnascript2gene file
-    :returns: a dictionary, resolving each transcript to a ensembl_gene_id
-    """
-    df = pd.read_csv(t2g_file, sep='\t', header=None, names=['transcript_id', 'ensembl_id', 'gene_symbol'])
-#     t2g_dict = df.set_index('transcript_id')['gene_symbol'].to_dict()
-    t2g_dict = df.set_index('transcript_id')['ensembl_id'].to_dict()
-    return t2g_dict
+from utils import read_t2g
 
 
 def _list_of_expression_vectors_to_matrix(expressionvectors, all_genes):
@@ -54,16 +44,15 @@ def _records2genevector(records, ec2gene_dict):
     return expr_vector, n_multimapped
 
 
-def kallisto_count(bus: Bus, t2g_file):
+def _kallisto_count(cell_iterator, ec_dict, transcript_dict, t2g_file):
     """
     python version of the kallisto count command. Turns a busfile into a adata object
     """
+    t2g_df = read_t2g(t2g_file)  # transcripts -> gene name
+    t2g = t2g_df.set_index('transcript_id')['ensembl_id'].to_dict()
 
-    # establish the mapping from EC->set(gene_ids):
-    # -------------------------------------------
-    t2g = read_t2g(t2g_file)  # transcripts -> gene name
-    ec2tr = {EC: [bus.transcript_dict[_] for _ in bus.ec_dict[EC]] for EC in bus.ec_dict.keys()}  # EC -> transcript
-    ec2gene = {EC: set(t2g[t] if t in t2g else t for t in ec2tr[EC]) for EC in bus.ec_dict.keys()}
+    ec2tr = {EC: [transcript_dict[_] for _ in ec_dict[EC]] for EC in ec_dict.keys()}  # EC -> transcript
+    ec2gene = {EC: set(t2g[t] if t in t2g else t for t in ec2tr[EC]) for EC in ec_dict.keys()}
 
     all_genes = set(t2g.values()) | set(itertools.chain.from_iterable(ec2gene.values()))
     all_genes = sorted(list(all_genes))
@@ -72,7 +61,7 @@ def kallisto_count(bus: Bus, t2g_file):
     cbs = []
     n_multimapped = 0
     n_total = 0
-    for cb, recordlist in tqdm.tqdm(bus.iterate_cells()):
+    for cb, recordlist in tqdm.tqdm(cell_iterator, desc='Iterating cells'):
         expr_vector, n_multi = _records2genevector(recordlist, ec2gene)
         n_multimapped += n_multi
         n_total += len(recordlist)
@@ -91,3 +80,11 @@ def kallisto_count(bus: Bus, t2g_file):
 
     adata = annotate_gene_symbols(adata)
     return adata
+
+
+def kallisto_count(bus: Bus, t2g_file):
+    """
+    python version of the kallisto count command. Turns a busfile into a adata object
+    """
+    cell_iterator = bus.iterate_cells()
+    return _kallisto_count(cell_iterator, bus.ec_dict, bus.transcript_dict, t2g_file)

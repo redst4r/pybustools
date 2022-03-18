@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus
 from pybustools.busio import Bus_record
+from utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
 
 class CUHistogram():
@@ -51,6 +52,7 @@ class CUHistogram():
             return self.histogram == other.histogram
         return False
 
+
 def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
     """
     iterating over a busfile, grouping CB/UMI and gene, i.e. all busrecords
@@ -82,17 +84,6 @@ def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
     print(f'Total CB/UMI: {total}\nMultimapped: {multimapped} ({100*multimapped/total:.2f}%)\nDiscarded:{discarded} ({100*discarded/total:.2f}%)')
 
 
-def _make_transcript2gene_df(t2gfile: str):
-    """
-    loading a transcript->gene file, turning it into a proper dataframe
-    """
-    
-    t2g_df = pd.read_csv(t2gfile,
-                         sep='\t', header=None,
-                         names=['transcript_id', 'gene_id', 'symbol'])
-    return t2g_df
-
-
 def _make_ec2gene_dict(bus: Bus, t2gfile):
     """
     a dict mapping EC to a list of genes
@@ -100,8 +91,8 @@ def _make_ec2gene_dict(bus: Bus, t2gfile):
     :params bus: a pybustools.Bus object
     :params t2gfile: filename of the transcript-to-gene mapping
     """
-    t2g_df = _make_transcript2gene_df(t2gfile)
-    t2g = {row['transcript_id']: row['symbol'] for _, row in t2g_df.iterrows()}
+    t2g_df = read_t2g(t2gfile)
+    t2g = {row['transcript_id']: row['gene_symbol'] for _, row in t2g_df.iterrows()}
 
     def genes_for_ec(ec_id):
         "get all genes for a particular EC"
@@ -168,11 +159,9 @@ def make_ec_histogram_across_genes(bus: Bus, collapse_EC=False, t2gfile=None):
 
     for r in tqdm.tqdm(I):
         ec_hist[r.COUNT] += 1
-        
+
     ec_hist = CUHistogram(ec_hist)  # turn into class
     return ec_hist
-
-
 
 
 def binomial_downsample_all_genes(CU_histogram_dict, fraction):
@@ -201,6 +190,7 @@ def binomial_downsample_all_genes(CU_histogram_dict, fraction):
         res = toolz.valfilter(lambda v: v != 0, res)
         downsampled_dict[gene] = CUHistogram(res)
     return downsampled_dict
+
 
 def binomial_downsample(CU: CUHistogram, fraction):
     """

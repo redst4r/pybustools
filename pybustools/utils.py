@@ -6,6 +6,18 @@ import subprocess
 import sys
 import h5py
 from pybustools.busio import Bus_record, write_busfile, _encode_ACGT_to_int
+import pandas as pd
+
+
+def read_t2g(t2g_file):
+    """
+    reading the kallisto trnascript2gene file
+    :returns: a dataframe with transcript id, gene id and gene symbol
+    """
+    df = pd.read_csv(t2g_file, sep='\t', header=None, names=['transcript_id', 'ensembl_id', 'gene_symbol'])
+#     t2g_dict = df.set_index('transcript_id')['gene_symbol'].to_dict()
+    # t2g_dict = df.set_index('transcript_id')['ensembl_id'].to_dict()
+    return df
 
 
 def count_cb_umi_pairs(busfile):
@@ -108,13 +120,11 @@ def h5_to_bus(h5filename, busfile_output, TMPDIR=None):
     # note that the tmp file wont be deleted if an exception happens above!
     os.unlink(unsorted_name)
 
-    
+
     # in addition create matrix.ec and transcripts.txt
     # Matrix.ec is a two column text file with
     # EC_id  --> [transcript_ID]
     #
     # nd transcripts.txt is just transcript names (ENST....), one per line (linenumber == transcript_ID)
-    # 
+    #
     # TODO: DO THIS, currently not even enccessary, as we only use this to determine non-unique CB/UMIs across multiple bus files
-    
-    
