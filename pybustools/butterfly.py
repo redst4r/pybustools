@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus
 from pybustools.busio import Bus_record
-from utils import read_t2g
+from pybustools.utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
 
 class CUHistogram():
@@ -90,6 +90,8 @@ def _make_ec2gene_dict(bus: Bus, t2gfile):
 
     :params bus: a pybustools.Bus object
     :params t2gfile: filename of the transcript-to-gene mapping
+
+    :returns:  dictionary int->list(genes)
     """
     t2g_df = read_t2g(t2gfile)
     t2g = {row['transcript_id']: row['gene_symbol'] for _, row in t2g_df.iterrows()}
@@ -97,10 +99,12 @@ def _make_ec2gene_dict(bus: Bus, t2gfile):
     def genes_for_ec(ec_id):
         "get all genes for a particular EC"
         transcripts = bus.resolve_EC_to_transcripts(ec_id)
-        genes = {t2g[trans] for trans in transcripts if trans in t2g}
+        genes = {t2g[trans] for trans in transcripts if trans in t2g}  # Set: uses about 2x memory of a list
+        # lets turn it into a list (items are still unique, but smaller mem footprint)
+        genes = list(genes)
         return genes
 
-    ec2gene = {ec :genes_for_ec(ec) for ec in tqdm.tqdm(bus.ec_dict.keys(), desc='translating EC to gene')}
+    ec2gene = {ec: genes_for_ec(ec) for ec in tqdm.tqdm(bus.ec_dict.keys(), desc='translating EC to gene')}
     return ec2gene
 
 
@@ -125,23 +129,24 @@ def make_ec_histograms(bus: Bus, collapse_EC=False, t2gfile=None):
         I = (record_list[0] for (cb, umi), record_list in I if len(record_list) == 1)
 
     for r in tqdm.tqdm(I):
-        if not r.EC in ec_hists:
+        if r.EC not in ec_hists:
             ec_hists[r.EC] = collections.defaultdict(int)
 
         ec_hists[r.EC][r.COUNT] += 1
     ec_hists = toolz.valmap(CUHistogram, ec_hists)  # turn into class
     return ec_hists
 
+
 def make_ec_histogram_across_genes(bus: Bus, collapse_EC=False, t2gfile=None):
     """
     create one big CU-histogram (pooled over genes). In contrast make_ec_histograms() does this gene by gene
-    This method here has a much smaller memory footprint and for things like unseen species it is enough 
+    This method here has a much smaller memory footprint and for things like unseen species it is enough
     (we'd aggregate the gene wise CUs anyway)!
-    
+
     Note that theres still a collapse_EC argument: This determines how we count: Suppose there's two entries of CB/UMI/EC1 and CB/UMI/EC2.
     If Gene[EC1] == Gene[EC2], do we count this a single molecule with two copies (collapse_EC=True) or two molecules with a single copy (collapse_EC=False)
     Actually, the collapse_EC=False would be dropped as it is multimapped!!
-    
+
     :params bus: a pybustools.Bus object
     :returns: a dictionary of CU histograms (one item per EC)
     """

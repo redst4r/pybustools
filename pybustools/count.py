@@ -6,7 +6,7 @@ from scipy.sparse import csr_matrix
 from pybustools.pybustools import Bus
 import tqdm
 from sctools.kallisto import annotate_gene_symbols
-from utils import read_t2g
+from pybustools.utils import read_t2g
 
 
 def _list_of_expression_vectors_to_matrix(expressionvectors, all_genes):
