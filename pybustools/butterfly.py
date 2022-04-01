@@ -5,10 +5,11 @@ from scipy.stats import binom
 import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus
+from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus, records_to_gene
 from pybustools.busio import Bus_record
 from pybustools.utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
+
 
 class CUHistogram():
     """
@@ -16,6 +17,7 @@ class CUHistogram():
 
     dictionary of amplification -> frequecny
     """
+
     def __init__(self, CU_dict):
         self.histogram = CU_dict  # copies per UMI histogram
 
@@ -65,8 +67,8 @@ def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
         total += 1
         # whats the ECs and are they compatible with a single gene
         # ecs can map to multiple genes
-        gene_sets = [set(ec2gene_dict[r.EC]) for r in record_list]
-        common_gene = set.intersection(*gene_sets)
+
+        common_gene = set(records_to_gene(record_list))
         if len(common_gene) == 0:
             # no single gene that can explain it
             discarded += 1

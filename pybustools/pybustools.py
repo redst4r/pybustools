@@ -53,7 +53,7 @@ class Bus(_Bus):
         )
 
 
-def records_to_gene(records, ec2g):
+def records_to_gene(records: list, ec2g) -> list:
     """
     is there one or more genes that are consistent across all the records of this CB/UMI
     returns the set of genes that are shared by all the records
