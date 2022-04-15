@@ -68,7 +68,7 @@ def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
         # whats the ECs and are they compatible with a single gene
         # ecs can map to multiple genes
 
-        common_gene = set(records_to_gene(record_list))
+        common_gene = set(records_to_gene(record_list, ec2gene_dict))
         if len(common_gene) == 0:
             # no single gene that can explain it
             discarded += 1
