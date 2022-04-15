@@ -139,6 +139,34 @@ def make_ec_histograms(bus: Bus, collapse_EC=False, t2gfile=None):
     return ec_hists
 
 
+def make_ec_histograms_across_CB(bus: Bus, collapse_EC=False, t2gfile=None):
+    """
+    for all cells (CB) in the busfile create a CU-histogram (a histogram of the
+    amplification, ie. number of reads per UMI)
+
+    :params bus: a pybustools.Bus object
+    :returns: a dictionary of CU histograms (one item per CB)
+    """
+    ec_hists = {}
+
+    if collapse_EC:
+        assert t2gfile is not None
+        ec2g = _make_ec2gene_dict(bus, t2gfile)
+        I = _collapsed_gene_busiterator(bus.bus_file, ec2g)
+    else:
+        I = iterate_CB_UMI_of_busfile(bus.bus_file)
+        # filtering records that map to more than one EC
+        # this is not totally correct (the two ECs might overlap in a single gene)
+        I = (record_list[0] for (cb, umi), record_list in I if len(record_list) == 1)
+
+    for r in tqdm.tqdm(I):
+        if r.CB not in ec_hists:
+            ec_hists[r.CB] = collections.defaultdict(int)
+
+        ec_hists[r.CB][r.COUNT] += 1
+    ec_hists = toolz.valmap(CUHistogram, ec_hists)  # turn into class
+    return ec_hists
+
 def make_ec_histogram_across_genes(bus: Bus, collapse_EC=False, t2gfile=None):
     """
     create one big CU-histogram (pooled over genes). In contrast make_ec_histograms() does this gene by gene
