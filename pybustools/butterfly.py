@@ -351,6 +351,8 @@ def saturation_curve(CU_aggr, bins=20):
             'n_reads': n_reads,
             'n_umi': n_umi,
             'f': f,
+            'cellranger_sat': 1-n_umi/n_reads,
+            'turing_sat': 1-hdown.FSCM()
         })
     df_down2 = pd.DataFrame(df_down2)
     return df_down2
