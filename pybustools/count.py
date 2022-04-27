@@ -30,6 +30,8 @@ def _records2genevector(records, ec2gene_dict):
     """
     turns a set of bus-records (from one cell) into a dict: gene->abundance
     multimapped records (EC mapping to more than one gene) are discarded
+
+    TODO this doesnt deal with the same UMI occuring with different ECs
     """
     expr_vector = collections.defaultdict(int)
     n_multimapped = 0

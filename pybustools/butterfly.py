@@ -79,7 +79,6 @@ def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
         else:
             # more than one gene
             multimapped += 1
-#             print(common_gene)
         if total % 5_000_000 == 0 and verbose:
             print(f'Total CB/UMI: {total}\nMultimapped: {multimapped} ({100*multimapped/total:.2f}%)\nDiscarded:{discarded} ({100*discarded/total:.2f}%)')
 
@@ -351,6 +350,7 @@ def saturation_curve(CU_aggr, bins=20):
             'n_reads': n_reads,
             'n_umi': n_umi,
             'f': f,
+            'f_umi': n_umi / CU_aggr.get_nUMI(),
             'cellranger_sat': 1-n_umi/n_reads,
             'turing_sat': 1-hdown.FSCM()
         })
@@ -390,13 +390,3 @@ def saturation_curve_per_gene(CU_dict, fractions=None, cores=1):
         })
     df_down = pd.DataFrame(df_down)
     return df_down
-
-"""
-ec2g = _make_ec2gene_dict(bus, t2gfile)
-h = make_ec_histograms(bus)
-
-import toolz
-h_new = toolz.valmap(lambda CUhist: binomial_downsample(CUhist, 0.50), h)
-
-fg = binomial_downsample_factors(h2, h2_new)
-"""
