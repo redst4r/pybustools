@@ -3,7 +3,8 @@ import collections
 import toolz
 from pybustools.busio import Bus_record, get_header_info, _encode_ACGT_to_int, _decode_int_to_ACGT
 from pybustools.pybustools import iterate_CB_UMI_of_busfile
-import numpy as np 
+from pybustools.butterfly import CUHistogram
+import numpy as np
 import random
 
 
@@ -109,6 +110,8 @@ def make_ec_histograms_adding_umi_error(bus, t2gfile, R1error):
             ec_hists[r.EC] = collections.defaultdict(int)
 
         ec_hists[r.EC][r.COUNT] += 1
+    ec_hists = toolz.valmap(CUHistogram, ec_hists)
+
     return ec_hists
 
 if False:
