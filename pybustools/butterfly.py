@@ -55,6 +55,18 @@ class CUHistogram():
         return False
 
 
+def prune_CU(CU:CUHistogram, cutoff_freq=0):
+    """
+    prunes very low frequency entries from the CU histogram. Sometimes useful, as binomial downsampling can lead to HUGE CU-histograms (several 100 entriesm), but most of them carrying almost no counts (i.e. <1e-16).
+
+    :param CU: CU histogram to prune
+    :param cutoff_freq: remove any entries k with CU.histogram[k] <= cutoff_freq
+    :returns: pruned CU histogtram
+    """
+    H = toolz.valfilter(lambda x: x> cutoff_freq, CU.histogram)
+    return CUHistogram(H)
+
+
 def _collapsed_gene_busiterator(bus_file: str, ec2gene_dict, verbose=False):
     """
     iterating over a busfile, grouping CB/UMI and gene, i.e. all busrecords
@@ -327,14 +339,17 @@ def compare_histograms_OT(h1, h2):
     return ot.emd2(a, b, M)
 
 
-def plot_CU(CU, norm=True):
+def plot_CU(CU, norm=True, label=None):
     q = pd.Series(CU.histogram).sort_index()
-
     values = q.values
     if norm:
         values = values/values.sum()
     ix = values!=0
     plt.scatter(q.index[ix], values[ix])
+    if label:
+        plt.plot(q.index[ix], values[ix], label=label)
+    else:
+        plt.plot(q.index[ix], values[ix])
     plt.xlabel('Reads per UMI')
     plt.ylabel('Fraction')
 
