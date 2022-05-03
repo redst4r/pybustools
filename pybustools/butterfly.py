@@ -405,3 +405,72 @@ def saturation_curve_per_gene(CU_dict, fractions=None, cores=1):
         })
     df_down = pd.DataFrame(df_down)
     return df_down
+
+
+import numpy as np
+def introduce_sequencing_error_to_CU(CU, perror):
+    """
+    add sequencing error to a CU histogram. Assuming each entry is identified as a unique CB/UMI combo (and the respective number of reads/copies, prevalence), a sequencing error will reduce the current prevalence, and create a new 1-Copy molecule.
+
+    We can use the downsampling routine:
+    Subsample/select reads that are error free (essentially removing the reads with errors).
+    Now all the reads removed are essentially 1-copy molecules (assuming that an error creates a new unique CB/UMI)
+    """
+    CU_error_free = binomial_downsample(CU, 1-perror)
+    lost_reads = CU.get_nreads() - CU_error_free.get_nreads()
+    lost_UMI = CU.get_nUMI() - CU_error_free.get_nUMI()
+
+    # correct the subsampled CU:
+    CU_error_free.histogram[0] = 0  # TODO lost_UMI is exactly this qunatigiy
+    CU_error_free.histogram[1] = CU_error_free.histogram[1] + lost_reads
+
+    CU_with_errors=CU_error_free  # to clear up confusing naming
+    del CU_error_free
+
+    reads_before = CU_with_errors.get_nreads()
+    reads_after = CU.get_nreads()
+    np.testing.assert_almost_equal(reads_before, reads_after, err_msg=f"somehow the number of total reads changed, which cant be! Its just being redistributed {reads_before}:{reads_after}")
+
+    # just prune away some VERY LOW frequencies
+    CU_with_errors = prune_CU(CU_with_errors, 1e-100)
+    return CU_with_errors
+
+"""
+this does exactly the same as introduce_sequencing_error_to_CU(), but not using the binomial downsamppling
+routine which is more elegant.
+Keeping it for historic reasons for now
+"""
+from scipy.stats import binom
+def predict_CU_with_errors(CU_dict_aggr, perror):
+    raise ValueError('deprecated: Use introduce_sequencing_error_to_CU')
+    new_counts = collections.defaultdict(int)
+    matrix = np.zeros([max(CU_dict_aggr.histogram.keys())+1, max(CU_dict_aggr.histogram.keys())+1])
+    for i, freq in CU_dict_aggr.histogram.items():
+        # we have a molecule with i copies.
+        # hence we can make i errors
+        # each amount of errors will lead to a different count, assuming eacg error creates an independent molecule (no collisions).
+        # 5 copies:
+        # - 0 error: 5 copies
+        # - 1 error: 1copy + 4 copies
+        # - 2 erros: 1copy + 1 copy + 3copies
+        resulting_counts = collections.defaultdict(int)  # this are the resulting counts for a SINGLE UMI of multiplicity i
+        for n_errors in range(i+1):
+            p = binom(n=i, p=perror).pmf(n_errors)
+            if n_errors == 0:
+#                 print(f'i=={i}, errors={n_errors}; adding 1 to {i} copies')
+                resulting_counts[i] += p  # no mutation in any of the reads
+            elif n_errors == i or n_errors == i -1 :
+#                 print(f'i=={i}, errors={n_errors}; adding {i} to 1 copies')
+                resulting_counts[1] += i*p  # all errors or all but one. this leads to i indepentend new molecules
+            else: # otherise we get n_error singletons, the rest is a single count of copy i-n_error, i.g. i=5, 3 errors  1,1,1,2
+                resulting_counts[1] += p *n_errors
+                resulting_counts[i-n_errors] += p *1
+#                 print(f'i=={i}, errors={n_errors}; adding {n_errors} to 1 copies and 1 to {i-n_errors} copies')
+
+        assert np.round(freq*sum(k*v for k,v in resulting_counts.items())) == i*freq
+
+        # update the overall dict
+        for j, expected_freq in resulting_counts.items():
+            new_counts[j] += freq * expected_freq
+            matrix[i,j] = expected_freq
+    return CUHistogram(new_counts)
