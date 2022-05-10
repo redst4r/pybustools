@@ -1,8 +1,8 @@
+import pathlib
 import numpy as np
 from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_header_info
 from pybustools.pybustools import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile
 import tqdm
-import os
 import shutil
 
 
@@ -86,7 +86,7 @@ def subsample_kallisto_bus(busdir, outdir, fraction):
 
     """
     assert 1 == 0, "we can replace the entire thing with bustools count --downsample!!"
-    assert os.path.exists(outdir)
+    assert pathlib.Path(outdir).exists()
     infile = f'{busdir}/output.corrected.sort.bus'
     outfile = f'{outdir}/output.corrected.sort.bus'
 
@@ -104,4 +104,6 @@ def subsample_bustools(bus, t2gfile, fraction, outdir_and_prefix):
     """
     creates the call to bustools count for subsampling a busfile. MUCH fast than doign it in python
     """
+    p = pathlib.Path(outdir_and_prefix)
+    assert p.parent.exists(), "outputfolder doenst exist. if not estining bustools will quitely fail"
     print(f"bustools count --genecounts -o {outdir_and_prefix} -d {fraction} -t {bus.transcript_file} -e {bus.ec_file} --genemap {t2gfile} {bus.bus_file}")
