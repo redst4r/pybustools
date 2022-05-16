@@ -7,6 +7,14 @@ from pybustools.pybustools import Bus
 import tqdm
 from sctools.kallisto import annotate_gene_symbols
 from pybustools.utils import read_t2g
+from pathlib import Path
+
+def bustools_count_call(bus: Bus, outdir: str, t2g_file: str, optional_args:str=''):
+    """
+    creates the call to turn a busfile into a count matrix via bustools count
+    """
+    assert Path(bus.ec_file).exists() and Path(bus.transcript_file).exists() and Path(bus.bus_file).exists()
+    return f'bustools count -o {outdir} -e {bus.ec_file} -g {t2g_file} -t {bus.transcript_file} --genecounts {optional_args} {bus.bus_file}'
 
 
 def _list_of_expression_vectors_to_matrix(expressionvectors, all_genes):
