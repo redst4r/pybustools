@@ -25,9 +25,9 @@ def _group_busrecords_by_cb_umi_ec(record_list):
             new_list[CUE] = new_record
     return list(new_list.values())
 
+
 def errorneous_CB_UMI_iterator(bus_file, R1error, decode_seq):
- 
-    """ 
+    """
     some problems:
         - this yields as  (CB,UMI). Errors in the CB will lead to out of order CBs
         - CB/UMI errors are lumped together
@@ -41,6 +41,7 @@ def errorneous_CB_UMI_iterator(bus_file, R1error, decode_seq):
         if n_errorneous_reads == 0:
             yield (cb, umi), record_list
         else:
+            emitted_reads = 0  # just some sanity check that we emit the same number of reads again, just distributed over different set of CM/UMI
             unfolded_records = []
             for r in record_list:
                 # unfold the reads
@@ -55,13 +56,14 @@ def errorneous_CB_UMI_iterator(bus_file, R1error, decode_seq):
             # groub by CB,UMI,EC
             correct_reads = _group_busrecords_by_cb_umi_ec(unfolded_records[:n_correct_reads])
             if n_correct_reads>0:
-#                 print('yielding correct')
+                for r in correct_reads:
+                    emitted_reads += r.COUNT
                 yield (cb, umi), correct_reads
-            
+
             # now the damaged ones
             # note that we just add an artifical base X. In theory, that CB/UMI could mutate into an already existing one, adding a count there
             # but the sequential way of the busfile-iterator cant hanlde that anyway. As long as the error rate is small this shouldt matter!
-            # 
+            #
             # also, to introduce the error, we have to decode/encode the CB/UMI (if the iterator doesnt decode already)
             damaged_reads = []
             for r in unfolded_records[n_correct_reads:]: # all the ones with mistakes in R1
@@ -84,8 +86,10 @@ def errorneous_CB_UMI_iterator(bus_file, R1error, decode_seq):
             damaged_reads = _group_busrecords_by_cb_umi_ec(damaged_reads) # this should rarely group anything!
 
             for r in damaged_reads:
-#                 print('yielding damaged')
+                emitted_reads += r.COUNT
                 yield (r.CB, r.UMI), [r]
+
+            assert n_reads == emitted_reads, f"number of reads differs from emmited reads: {n_reads}:{emitted_reads}"
 
 def _mutate_randomly(seq):
     error_position = np.random.choice(len(seq))
