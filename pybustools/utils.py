@@ -9,6 +9,15 @@ from pybustools.busio import Bus_record, write_busfile, _encode_ACGT_to_int
 import pandas as pd
 
 
+def map_ec2gene(bus, t2gfile):
+    """
+    create a (busfile specific) dict to resolve ECs to gene
+    """
+    t2g = read_t2g(t2gfile).set_index('transcript_id')['gene_symbol'].to_dict()
+    ec2tr = {EC: [bus.transcript_dict[_] for _ in bus.ec_dict[EC]] for EC in bus.ec_dict.keys()}  # EC -> transcript
+    ec2gene = {EC: list(set(t2g[t] if t in t2g else t for t in ec2tr[EC])) for EC in bus.ec_dict.keys()}
+    return ec2gene
+
 def read_t2g(t2g_file):
     """
     reading the kallisto trnascript2gene file
