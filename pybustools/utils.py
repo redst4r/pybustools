@@ -7,6 +7,7 @@ import sys
 import h5py
 from pybustools.busio import Bus_record, write_busfile, _encode_ACGT_to_int
 import pandas as pd
+from multiprocessing import Pool
 
 
 def read_t2g(t2g_file):
@@ -128,3 +129,33 @@ def h5_to_bus(h5filename, busfile_output, TMPDIR=None):
     # nd transcripts.txt is just transcript names (ENST....), one per line (linenumber == transcript_ID)
     #
     # TODO: DO THIS, currently not even enccessary, as we only use this to determine non-unique CB/UMIs across multiple bus files
+
+
+def _dummy(func, k, v):
+    """
+    helper for the parallel valmap, wrapping the val-function so that it also returns the key
+
+    d = {'a':1,'b':2}
+    def f(x):
+        return x+1
+    parallel_valmap(f, d, cores=8)
+    """
+    return k, func(v)
+
+
+def parallel_valmap(func, dictionary, cores=8):
+    """
+    just as toolz.valmap, but do it in paralell across entries
+    """
+    kv_pairs = [(k,v) for k,v in dictionary.items()]
+    s = toolz.partial(_dummy, func) # 
+
+    with Pool(cores) as p:
+#     p = Pool(cores)
+    
+        res = p.starmap(s, kv_pairs)
+#     p.close()
+    
+    res2 = {k: v for k,v in res}
+    return res2
+
