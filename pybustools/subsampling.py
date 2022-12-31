@@ -100,7 +100,7 @@ def subsample_kallisto_bus(busdir, outdir, fraction):
     shutil.copy(transcripts, outdir)
 
 
-def subsample_bustools(bus, t2gfile, fraction, outdir_and_prefix):
+def subsample_bustools(bus: Bus, t2gfile:str, fraction:float, outdir_and_prefix:str):
     """
     creates the call to bustools count for subsampling a busfile. MUCH fast than doign it in python
     """
