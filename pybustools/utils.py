@@ -8,7 +8,7 @@ import h5py
 from pybustools.busio import Bus_record, write_busfile, _encode_ACGT_to_int
 import pandas as pd
 from multiprocessing import Pool
-
+import toolz
 
 def map_ec2gene(bus, t2gfile):
     """
@@ -157,14 +157,11 @@ def parallel_valmap(func, dictionary, cores=8):
     just as toolz.valmap, but do it in paralell across entries
     """
     kv_pairs = [(k,v) for k,v in dictionary.items()]
-    s = toolz.partial(_dummy, func) # 
+    s = toolz.partial(_dummy, func) 
 
     with Pool(cores) as p:
-#     p = Pool(cores)
-    
         res = p.starmap(s, kv_pairs)
-#     p.close()
-    
+
     res2 = {k: v for k,v in res}
     return res2
 

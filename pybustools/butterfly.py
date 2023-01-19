@@ -11,6 +11,15 @@ from pybustools.utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
 
 
+def make_saturation_curve(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
+    """
+    turns a busfolder into a saturation graph
+    """
+    ec_hist = make_ec_histograms(Bus(busfolder, decode_seq=False), collapse_EC=collapse_EC, t2gfile=t2g)
+    ec_aggr = aggregate_CUs(ec_hist)
+    return saturation_curve(ec_aggr, bins=bins)
+
+
 class CUHistogram():
     """
     Histogram of the Copies per UMI (CU) with some convenience functions
