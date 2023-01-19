@@ -34,6 +34,43 @@ def _list_of_expression_vectors_to_matrix(expressionvectors, all_genes):
     return X
 
 
+def _group_records_by_cb_umi(record_list):
+    D = collections.defaultdict(list)
+
+    for r in record_list:
+        D[(r.CB, r.UMI)].append(r)
+
+    for (cb, umi), records in D.items():
+        yield (cb, umi), records
+
+
+from pybustools.pybustools import records_to_gene
+def _records2genevector_better(records, ec2gene_dict):
+    """
+    turns a set of bus-records (from one cell) into a dict: gene->abundance
+    multimapped records (EC mapping to more than one gene) are discarded
+
+    TODO this doesnt deal with the same UMI occuring with different ECs
+    """
+    expr_vector = collections.defaultdict(int)
+    n_multimapped = 0
+    n_unmappable = 0
+
+    for (_, _), rlist in _group_records_by_cb_umi(records):
+        genes = records_to_gene(rlist, ec2gene_dict)
+        if len(genes) > 1:
+            # multimapped
+            n_multimapped += 1
+        elif len(genes) == 1:
+            genes = list(genes)[0]
+            expr_vector[genes] += 1
+        else:
+            #unmappable
+            n_unmappable += 1
+    return expr_vector, n_multimapped, n_unmappable
+
+
+
 def _records2genevector(records, ec2gene_dict):
     """
     turns a set of bus-records (from one cell) into a dict: gene->abundance
