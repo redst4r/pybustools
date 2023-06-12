@@ -9,8 +9,9 @@ from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus, records_to_gen
 from pybustools.busio import Bus_record
 from pybustools.utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
-
-
+import tempfile
+import subprocess
+import sys
 def make_saturation_curve(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
     """
     turns a busfolder into a saturation graph
@@ -19,6 +20,35 @@ def make_saturation_curve(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
     ec_aggr = aggregate_CUs(ec_hist)
     return saturation_curve(ec_aggr, bins=bins)
 
+
+def make_saturation_curve_RUST(busfolder: str, bins, collapse_EC: bool, t2g:str):
+    """
+    doing the heavy lifting in rust for speed
+    """
+    with tempfile.TemporaryDirectory() as tmpdirname:
+    # tmpdirname='/tmp'
+        print('created temporary directory', tmpdirname)
+        tmpfile = f'{tmpdirname}/butterfly.csv'
+        cmd = f'cd /home/michi/Dropbox/rustbustools; cargo run --quiet --release -- --output {tmpfile} butterfly --ifile {busfolder} --t2g {t2g}'
+
+        if collapse_EC:
+            cmd += " --collapse"
+
+        ret = subprocess.run(
+            cmd,
+            check=True,
+            shell=True,
+        )
+        if ret.returncode != 0:
+            print("Child was terminated by signal", ret, file=sys.stderr)
+            raise ValueError("rust failed!", cmd)
+
+        # a DataFrame with two columns: Amplification, Frequency
+        df = pd.read_csv(tmpfile)
+    # turn into a dict Amp->Freq
+    d = df.set_index('Amplification')['Frequency'].to_dict()
+    cuhist = CUHistogram(d)
+    return saturation_curve(cuhist, bins=bins)
 
 class CUHistogram():
     """
@@ -47,7 +77,11 @@ class CUHistogram():
         return copies and frequencies as vectors
         """
         copies, freq = zip(*self.histogram.items())
-        return np.array(copies), np.array(freq)
+        copies, freq = np.array(copies), np.array(freq)
+
+        # sort them acc to size/copies
+        ix = np.argsort(copies)
+        return copies[ix], freq[ix]
 
     def FSCM(self):
         """
@@ -263,6 +297,7 @@ def binomial_downsample(CU: CUHistogram, fraction):
     j = np.arange(jmax+1)
 
     for i, hi in CU.histogram.items():
+        # the chance to sample j items of some color, given there's a total of i items of that color
         _t = binom.pmf(k=j, n=i, p=fraction) * hi
         hnew = hnew + _t
     return CUHistogram(dict(zip(j, hnew)))
@@ -363,7 +398,7 @@ def plot_CU(CU, norm=True, label=None):
     plt.ylabel('Fraction')
 
 
-def saturation_curve(CU_aggr, bins=20):
+def saturation_curve(CU_aggr: CUHistogram, bins=20):
     down_percentages = np.linspace(0.01, 1, bins)
     df_down2 = []
     for f in tqdm.tqdm(down_percentages):
