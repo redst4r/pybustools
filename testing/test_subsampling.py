@@ -1,6 +1,5 @@
 from pybustools import busio, subsampling
 
-
 def test_subsampling(tmp_path):
 
     # creating a total of 3 UMIs, nbut 10 counts

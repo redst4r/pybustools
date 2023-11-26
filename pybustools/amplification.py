@@ -4,12 +4,33 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pybustools.pybustools import Bus
-
+from pybustools.butterfly import make_ec2gene_dict, collapsed_gene_busiterator
 
 """
 a few functions to measure the 10x library amplification in kallisto-bus files
 """
 
+def create_per_gene_amp(bus: Bus, t2gfile):
+
+    ec2g = make_ec2gene_dict(bus, t2gfile)
+    I = collapsed_gene_busiterator(bus.bus_file, ec2g)
+
+
+    gene_counts = collections.defaultdict(list)
+    for record in tqdm.tqdm(I):
+        gene_counts[record.EC].append(record.COUNT)
+
+    df = [
+        {'the_gene': ec,
+         'nUMI': len(gene_counts[ec]),
+         'mean_amp': np.mean(gene_counts[ec]),
+         'std_amp': np.std(gene_counts[ec]),
+         'total_counts': np.sum(gene_counts[ec]),
+         'max_amp': np.max(gene_counts[ec]),
+         'percent_single_read': np.mean(np.array(gene_counts[ec]) == 1)
+         } for ec in gene_counts.keys()]
+    df = pd.DataFrame(df)
+    return df
 
 
 def create_per_EC_amp(bus: Bus, t2gfile = '/home/mstrasse/resources/transcripts_to_genes.txt'):

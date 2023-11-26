@@ -4,7 +4,7 @@ from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_hea
 from pybustools.pybustools import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile
 import tqdm
 import shutil
-
+from pybustools.pybustools import Bus
 
 def get_number_of_reads_and_molecules(fname):
     """
@@ -35,7 +35,7 @@ def subsample_busfile(fname_in, fname_out, fraction):
     :param fname_out: Filename of the resulting, subsampled busfile
     :param fraction: 0<fraction<1, the fraction of subsampling
     """
-    assert 1 == 0, "we can replace the entire thing with bustools count --downsample!!"
+    # assert 1 == 0, "we can replace the entire thing with bustools count --downsample!!"
     assert 0 < fraction < 1, "fraction must be in [0,1]"
 
     G = tqdm.tqdm(subsample_busfile_cb_umi_generator(fname_in, fraction))
