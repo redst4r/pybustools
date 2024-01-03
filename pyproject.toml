@@ -1,0 +1,28 @@
+[project]
+name = "pybustools"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Private :: Do Not Upload",
+]
+version="0.1.1"
+dependencies = [
+    "gmpy2",
+    "toolz",
+    "tqdm"
+]
+authors = [
+    {name = "redst4r", email = "redst4r@web.de"},
+]
+description = "Python functions to read the kallisto-bustools format"
+license = "BSD 2-Clause License"
+keywords=["RNAseq", "kallisto", "bustools"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"

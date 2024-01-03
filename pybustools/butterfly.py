@@ -21,34 +21,40 @@ def make_saturation_curve(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
     return saturation_curve(ec_aggr, bins=bins)
 
 
-def make_saturation_curve_RUST(busfolder: str, bins, collapse_EC: bool, t2g:str):
-    """
-    doing the heavy lifting in rust for speed
-    """
-    with tempfile.TemporaryDirectory() as tmpdirname:
-    # tmpdirname='/tmp'
-        print('created temporary directory', tmpdirname)
-        tmpfile = f'{tmpdirname}/butterfly.csv'
-        cmd = f'cd /home/michi/Dropbox/rustbustools; cargo run --quiet --release -- --output {tmpfile} butterfly --ifile {busfolder} --t2g {t2g}'
-
-        if collapse_EC:
-            cmd += " --collapse"
-
-        ret = subprocess.run(
-            cmd,
-            check=True,
-            shell=True,
-        )
-        if ret.returncode != 0:
-            print("Child was terminated by signal", ret, file=sys.stderr)
-            raise ValueError("rust failed!", cmd)
-
-        # a DataFrame with two columns: Amplification, Frequency
-        df = pd.read_csv(tmpfile)
-    # turn into a dict Amp->Freq
-    d = df.set_index('Amplification')['Frequency'].to_dict()
+import rustpybustools
+def make_saturation_curve_RUST2(busfolder: str, bins, collapse_EC: bool, t2g:str):
+    d = rustpybustools.make_ecs(busfolder, t2g, collapse_EC)
     cuhist = CUHistogram(d)
     return saturation_curve(cuhist, bins=bins)
+
+# def make_saturation_curve_RUST(busfolder: str, bins, collapse_EC: bool, t2g:str):
+#     """
+#     doing the heavy lifting in rust for speed
+#     """
+#     with tempfile.TemporaryDirectory() as tmpdirname:
+#     # tmpdirname='/tmp'
+#         print('created temporary directory', tmpdirname)
+#         tmpfile = f'{tmpdirname}/butterfly.csv'
+#         cmd = f'cd /home/michi/Dropbox/rustbustools; cargo run --quiet --release -- --output {tmpfile} butterfly --ifile {busfolder} --t2g {t2g}'
+
+#         if collapse_EC:
+#             cmd += " --collapse"
+
+#         ret = subprocess.run(
+#             cmd,
+#             check=True,
+#             shell=True,
+#         )
+#         if ret.returncode != 0:
+#             print("Child was terminated by signal", ret, file=sys.stderr)
+#             raise ValueError("rust failed!", cmd)
+
+#         # a DataFrame with two columns: Amplification, Frequency
+#         df = pd.read_csv(tmpfile)
+#     # turn into a dict Amp->Freq
+#     d = df.set_index('Amplification')['Frequency'].to_dict()
+#     cuhist = CUHistogram(d)
+#     return saturation_curve(cuhist, bins=bins)
 
 class CUHistogram():
     """
@@ -98,7 +104,7 @@ class CUHistogram():
         return False
 
 
-def prune_CU(CU:CUHistogram, cutoff_freq=0):
+def prune_CU(CU:CUHistogram, cutoff_freq=0.0):
     """
     prunes very low frequency entries from the CU histogram. Sometimes useful, as binomial downsampling can lead to HUGE CU-histograms (several 100 entriesm), but most of them carrying almost no counts (i.e. <1e-16).
 
