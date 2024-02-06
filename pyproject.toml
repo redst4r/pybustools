@@ -11,7 +11,11 @@ version="0.1.1"
 dependencies = [
     "gmpy2",
     "toolz",
-    "tqdm"
+    "tqdm",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "h5py",
 ]
 authors = [
     {name = "redst4r", email = "redst4r@web.de"},

@@ -1,4 +1,4 @@
-from pybustools.pybustools import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile
+from pybustools.pybus import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile
 import tqdm
 import os
 import tempfile

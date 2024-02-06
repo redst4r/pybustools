@@ -7,9 +7,8 @@ import numpy as np
 import networkx as nx
 import Levenshtein
 import pybktree
-from pybustools.pybustools import Bus
+from pybustools.pybus import Bus, iterate_cells_of_busfile_new
 from pybustools.busio import Bus_record, write_busfile
-from pybustools.pybustools import iterate_cells_of_busfile_new
 import tqdm
 from disjoint_set import DisjointSet
 

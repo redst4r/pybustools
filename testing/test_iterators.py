@@ -1,4 +1,4 @@
-from pybustools import busio, pybustools
+from pybustools import busio, pybus
 import pytest
 
 
@@ -15,11 +15,11 @@ def test_return_busrecord(tmp_path):
     fname = tmp_path / 'some.bus'
     busio.write_busfile(fname, records, cb_length=4, umi_length=3)
 
-    for cb, record_list in pybustools.iterate_cells_of_busfile(fname):
+    for cb, record_list in pybus.iterate_cells_of_busfile(fname):
         for r in record_list:
             assert isinstance(r, busio.Bus_record)
 
-    for cbumi, record_list in pybustools.iterate_CB_UMI_of_busfile(fname):
+    for cbumi, record_list in pybus.iterate_CB_UMI_of_busfile(fname):
         for r in record_list:
             assert isinstance(r, busio.Bus_record)
 
@@ -34,7 +34,7 @@ def test_iterate_cells(tmp_path):
     fname = tmp_path / 'some.bus'
     busio.write_busfile(fname, records, cb_length=4, umi_length=3)
 
-    gen = pybustools.iterate_cells_of_busfile(fname)
+    gen = pybus.iterate_cells_of_busfile(fname)
 
     # the first record must have two uMIs
     cb1, list1 = next(gen)
@@ -61,7 +61,7 @@ def test_iterate_cb_umi(tmp_path):
     fname = tmp_path / 'some.bus'
     busio.write_busfile(fname, records, cb_length=4, umi_length=3)
 
-    gen = pybustools.iterate_CB_UMI_of_busfile(fname)
+    gen = pybus.iterate_CB_UMI_of_busfile(fname)
 
     # the first record must have one entry
     cb1, list1 = next(gen)
@@ -90,7 +90,7 @@ def test_iterate_cells_raise_unsorted(tmp_path):
     busio.write_busfile(fname, records, cb_length=4, umi_length=3)
 
     with pytest.raises(ValueError):
-        gen = pybustools.iterate_cells_of_busfile(fname)
+        gen = pybus.iterate_cells_of_busfile(fname)
         list(gen)
 
 
@@ -106,7 +106,7 @@ def test_iterate_cells_UMI_raise_unsorted(tmp_path):
     busio.write_busfile(fname, records, cb_length=4, umi_length=3)
 
     with pytest.raises(ValueError):
-        gen = pybustools.iterate_CB_UMI_of_busfile(fname)
+        gen = pybus.iterate_CB_UMI_of_busfile(fname)
         list(gen)
 
     """
@@ -119,7 +119,7 @@ def test_iterate_cells_UMI_raise_unsorted(tmp_path):
     fname = tmp_path / 'some.bus'
     busio.write_busfile(fname, records, cb_length=4, umi_length=3)
     with pytest.raises(ValueError):
-        gen = pybustools.iterate_CB_UMI_of_busfile(fname)
+        gen = pybus.iterate_CB_UMI_of_busfile(fname)
         list(gen)
 
 
@@ -136,11 +136,11 @@ def test_records_to_genes():
         busio.Bus_record('TTAT', 'TAT', 0, 250, 13),  # maps to A,B
         busio.Bus_record('TTAT', 'TAT', 1, 250, 13),  # maps to B
     ]
-    assert pybustools.records_to_gene(records, ec2gene) == list('B')
+    assert pybus.records_to_gene(records, ec2gene) == list('B')
 
     # incompatible records
     records = [
         busio.Bus_record('TTAT', 'TAT', 0, 250, 13),  # maps to A,B
         busio.Bus_record('TTAT', 'TAT', 3, 250, 13),  # maps to C
     ]
-    assert pybustools.records_to_gene(records, ec2gene) == list()
+    assert pybus.records_to_gene(records, ec2gene) == list()

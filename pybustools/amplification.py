@@ -3,7 +3,7 @@ import tqdm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from pybustools.pybustools import Bus
+from pybustools.pybus import Bus
 from pybustools.butterfly import make_ec2gene_dict, collapsed_gene_busiterator
 
 """

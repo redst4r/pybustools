@@ -3,7 +3,8 @@ import scanpy as sc
 import pandas as pd
 import itertools
 from scipy.sparse import csr_matrix
-from pybustools.pybustools import Bus
+from pybustools.pybus import Bus, records_to_gene
+
 import tqdm
 from sctools.kallisto import annotate_gene_symbols
 from pybustools.utils import read_t2g
@@ -44,7 +45,6 @@ def _group_records_by_cb_umi(record_list):
         yield (cb, umi), records
 
 
-from pybustools.pybustools import records_to_gene
 def _records2genevector_better(records, ec2gene_dict):
     """
     turns a set of bus-records (from one cell) into a dict: gene->abundance

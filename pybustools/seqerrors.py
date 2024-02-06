@@ -2,7 +2,7 @@ import tqdm
 import collections
 import toolz
 from pybustools.busio import Bus_record, get_header_info, _encode_ACGT_to_int, _decode_int_to_ACGT
-from pybustools.pybustools import iterate_CB_UMI_of_busfile
+from pybustools.pybus import iterate_CB_UMI_of_busfile
 from pybustools.butterfly import CUHistogram
 import numpy as np
 import random

@@ -1,4 +1,4 @@
-from pybustools.pybustools import iterate_cells_of_busfile, iterate_CB_UMI_of_busfile
+from pybustools.pybus import iterate_cells_of_busfile, iterate_CB_UMI_of_busfile
 from pybustools import busio
 import multiprocessing as mp
 # import time
@@ -268,5 +268,5 @@ if __name__ == '__main__':
 
     results = {cb: info for cb, info in PCG.iterate()}
 
-    from pybustools.pybustools import iterate_bus_cells_multiple
+    from pybustools.pybus import iterate_bus_cells_multiple
     results_serial = {cb: info for cb,info in iterate_bus_cells_multiple(['sample1', 'sample2'], [fname1, fname2])}

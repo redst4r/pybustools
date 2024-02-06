@@ -1,5 +1,5 @@
 if __name__ == '__main__':
-    from pybustools.pybustools import Bus
+    from pybustools.pybus import Bus
     from pybustools.busio import read_binary_bus#, read_binary_bus2
     import collections
     import tqdm
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     """
     comparing the old read_binary_bus vs the new version using struct.iter_unpack
     """
-    from pybustools.pybustools import Bus
+    from pybustools.pybus import Bus
     from pybustools import busio, busio_old
 
     import collections

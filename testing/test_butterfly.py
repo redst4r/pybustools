@@ -1,6 +1,6 @@
 import os
 import pytest
-from pybustools.pybustools import _Bus
+from pybustools.pybus import _Bus
 from pybustools import busio
 from pybustools import butterfly
 from pybustools.butterfly import CUHistogram, saturation_curve

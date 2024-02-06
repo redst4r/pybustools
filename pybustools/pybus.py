@@ -46,9 +46,9 @@ class Bus(_Bus):
 
         folder = pathlib.Path(folder)
         super().__init__(
-            bus_name=folder / bus_name,
-            ec_name=folder / ec_name,
-            transcript_name=folder / transcript_name,
+            bus_name=str(folder / bus_name),
+            ec_name=str(folder / ec_name),
+            transcript_name=str(folder / transcript_name),
             decode_seq=decode_seq
         )
 

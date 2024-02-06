@@ -1,10 +1,9 @@
 import pathlib
 import numpy as np
 from pybustools.busio import read_binary_bus, Bus_record, write_busfile, get_header_info
-from pybustools.pybustools import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile
+from pybustools.pybus import iterate_CB_UMI_of_busfile, iterate_cells_of_busfile, Bus
 import tqdm
 import shutil
-from pybustools.pybustools import Bus
 
 def get_number_of_reads_and_molecules(fname):
     """

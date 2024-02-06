@@ -1,4 +1,4 @@
-from pybustools.pybustools import merge_iterators
+from pybustools.pybus import merge_iterators
 import pytest
 
 

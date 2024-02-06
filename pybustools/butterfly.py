@@ -5,7 +5,7 @@ from scipy.stats import binom
 import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from pybustools.pybustools import iterate_CB_UMI_of_busfile, Bus, records_to_gene
+from pybustools.pybus import iterate_CB_UMI_of_busfile, Bus, _Bus, records_to_gene
 from pybustools.busio import Bus_record
 from pybustools.utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'

@@ -2,9 +2,9 @@ import multiprocessing as mp
 import collections
 import itertools
 import os
-from pybustools.pybustools import Bus
+from pybustools.pybus import Bus
 from pybustools.busio import Bus_record, write_busfile
-from pybustools.pybustools import iterate_cells_of_busfile_new
+from pybustools.pybus import iterate_cells_of_busfile_new
 import tqdm
 from pybustools import busio
 import tempfile

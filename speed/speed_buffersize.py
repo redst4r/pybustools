@@ -1,4 +1,4 @@
-from pybustools.pybustools import Bus
+from pybustools.pybus import Bus
 from pybustools.busio import read_binary_bus#, read_binary_bus2
 import collections
 import toolz

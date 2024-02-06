@@ -1,6 +1,6 @@
 from pybustools.parallel_generators import ParallelCellGenerator, ParallelCellUMIGenerator, random_buslist
 from pybustools import busio
-from pybustools.pybustools import iterate_bus_cells_multiple, iterate_bus_cells_umi_multiple
+from pybustools.pybus import iterate_bus_cells_multiple, iterate_bus_cells_umi_multiple
 
 
 def test_ParallelCellGenerator():
