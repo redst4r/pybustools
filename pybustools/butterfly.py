@@ -12,6 +12,22 @@ from pybustools.utils import read_t2g
 import tempfile
 import subprocess
 import sys
+
+import pybustools.pybustools as rustbus
+def make_ec_histograms_rust(busfolder: Bus, collapse_EC: bool, t2gfile:str):
+    assert isinstance(busfolder, Bus) or isinstance(busfolder, _Bus)
+    d = rustbus.make_ecs(busfolder.bus_file, busfolder.ec_file, busfolder.transcript_file, t2gfile, collapse_EC)
+    cuhist = CUHistogram(d)
+    return cuhist
+
+def make_saturation_curve_rust(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
+    """
+    turns a busfolder into a saturation graph (faster as the backend is rust)
+    """
+    ec_hist = make_ec_histograms_rust(Bus(busfolder, decode_seq=False), collapse_EC=collapse_EC, t2gfile=t2g)
+    return saturation_curve(ec_hist, bins=bins)
+
+
 def make_saturation_curve(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
     """
     turns a busfolder into a saturation graph
@@ -19,42 +35,6 @@ def make_saturation_curve(busfolder: str,  bins, collapse_EC:bool, t2g: str,):
     ec_hist = make_ec_histograms(Bus(busfolder, decode_seq=False), collapse_EC=collapse_EC, t2gfile=t2g)
     ec_aggr = aggregate_CUs(ec_hist)
     return saturation_curve(ec_aggr, bins=bins)
-
-
-import rustpybustools
-def make_saturation_curve_RUST2(busfolder: str, bins, collapse_EC: bool, t2g:str):
-    d = rustpybustools.make_ecs(busfolder, t2g, collapse_EC)
-    cuhist = CUHistogram(d)
-    return saturation_curve(cuhist, bins=bins)
-
-# def make_saturation_curve_RUST(busfolder: str, bins, collapse_EC: bool, t2g:str):
-#     """
-#     doing the heavy lifting in rust for speed
-#     """
-#     with tempfile.TemporaryDirectory() as tmpdirname:
-#     # tmpdirname='/tmp'
-#         print('created temporary directory', tmpdirname)
-#         tmpfile = f'{tmpdirname}/butterfly.csv'
-#         cmd = f'cd /home/michi/Dropbox/rustbustools; cargo run --quiet --release -- --output {tmpfile} butterfly --ifile {busfolder} --t2g {t2g}'
-
-#         if collapse_EC:
-#             cmd += " --collapse"
-
-#         ret = subprocess.run(
-#             cmd,
-#             check=True,
-#             shell=True,
-#         )
-#         if ret.returncode != 0:
-#             print("Child was terminated by signal", ret, file=sys.stderr)
-#             raise ValueError("rust failed!", cmd)
-
-#         # a DataFrame with two columns: Amplification, Frequency
-#         df = pd.read_csv(tmpfile)
-#     # turn into a dict Amp->Freq
-#     d = df.set_index('Amplification')['Frequency'].to_dict()
-#     cuhist = CUHistogram(d)
-#     return saturation_curve(cuhist, bins=bins)
 
 class CUHistogram():
     """
