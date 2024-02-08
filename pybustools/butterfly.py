@@ -387,7 +387,7 @@ def plot_CU(CU, norm=True, label=None):
 def saturation_curve(CU_aggr: CUHistogram, bins=20):
     down_percentages = np.linspace(0.01, 1, bins)
     df_down2 = []
-    for f in tqdm.tqdm(down_percentages):
+    for f in down_percentages:
         hdown = binomial_downsample(CU=CU_aggr, fraction=f)
         n_reads = hdown.get_nreads()# sum([k*v for k,v in hdown.items()])
         n_umi = hdown.get_nUMI()# sum([v for k,v in hdown.items() if k > 0])
