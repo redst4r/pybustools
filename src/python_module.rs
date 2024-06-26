@@ -1,34 +1,41 @@
 use std::collections::HashMap;
-use bustools::{consistent_genes::{InconsistentResolution, MappingMode}, io::{BusFolder, BusReader, BusRecord}, iterators::{CbUmiGroupIterator, CellGroupIterator}, merger::MultiIterator, utils::get_progressbar};
+use bustools::{consistent_genes::{find_consistent, GeneId, InconsistentResolution, MappingMode}, consistent_transcripts::{find_consistent_transcripts, MappingResultTranscript, TranscriptId}, io::BusFolder, iterators::{CbUmiGroupIterator, CellGroupIterator}};
 use bustools_cli::butterfly::{self, CUHistogram};
-use pyo3::{prelude::*, types::{PyDict, PyFrozenSet, PyTuple}};
+use pyo3::prelude::*;
 
+use crate::{counting::cbumi_overlap, get_spinner};
 /// Quck howto
 /// ```python
 /// import rustpybustools
 /// rustpybustools.make_ecs('/home/michi/bus_testing/bus_output_shortest/', '/home/michi/bus_testing/transcripts_to_genes.txt', True)
 /// 
 
-
-/// Formats the sum of two numbers as string.
-// #[pyfunction]
-// fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-//     Ok((a + b).to_string())
-// }
-
 /// A Python module implemented in Rust.
 #[pymodule]
 fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     m.add_function(wrap_pyfunction!(cbumi_overlap, m)?)?;
-    m.add_function(wrap_pyfunction!(cb_overlap, m)?)?;
     m.add_function(wrap_pyfunction!(make_ecs_cb, m)?)?;
-    m.add_function(wrap_pyfunction!(phantom_fingerprint_cb, m)?)?;
-    m.add_function(wrap_pyfunction!(phantom_fingerprint_cbumi, m)?)?;
+    m.add_function(wrap_pyfunction!(make_ecs_ec, m)?)?;
+    m.add_function(wrap_pyfunction!(make_ecs_across_cb, m)?)?;
 
+    // m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cb, m)?)?;
+    // m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cbumi, m)?)?;
+    // m.add_function(wrap_pyfunction!(crate::phantom::rustphantom, m)?)?;
+    // m.add_function(wrap_pyfunction!(crate::phantom::rustphantom_filter, m)?)?;
+
+    m.add_function(wrap_pyfunction!(crate::counting::cb_overlap, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::counting::detect_cb_frequencies, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::counting::kmer_counter_cb, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::counting::count_reads_per_EC, m)?)?;
+    
     #[pyfn(m)]
     #[pyo3(name = "make_ecs")]
-    // fn make_ecs(foldername: &str, t2g_file: &str, collapse_ec:bool) -> PyResult<HashMap<usize, usize>> {
+    /// Count the frequency of frequency for the CB/UMI in the specified busfolders.
+    /// Essentially a wrapper around `butterfly::make_ecs`.
+    /// # Returns
+    /// - a HashMap/dictionary, where keys are the number of reads and values are the number of CB/UMI with that nreads.
+    /// 
     fn make_ecs(busfile: &str, matrix_file: &str, transcript_file: &str, t2g_file: &str, collapse_ec:bool) -> PyResult<HashMap<usize, usize>> {
 
         let folder = BusFolder::from_files(busfile, matrix_file, transcript_file);
@@ -42,7 +49,7 @@ fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
         };
         // println!("Done Making mapper");
 
-        let h = butterfly::make_ecs(&folder, mode);
+        let h = butterfly::make_ecs(&folder.get_busfile(), mode);
         // println!("umis: {}", h.get_numis());
         Ok(h.into())  // conversion into a hashmap/dict
     }
@@ -50,10 +57,40 @@ fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-/// counts frequencies of barcodes
+
+/// Per barcode, creates a CUHistogram: In that cell, how often do you see a UMI with n_reads
+#[pyfunction]
+fn make_ecs_across_cb(
+    busfile: &str, matrix_file: &str, transcript_file: &str,
+    // collapse_ec:bool,
+) -> PyResult<HashMap<u64, HashMap<usize, usize>>> {
+
+    let folder = BusFolder::from_files(busfile, matrix_file, transcript_file);
+    // let mut h_read: HashMap<u64, CUHistogram> = HashMap::new();
+    let mut h_read: HashMap<u64, HashMap<usize, usize>> = HashMap::new();
+    
+    for (_cb, records) in folder.get_iterator().groupby_cb() {
+        let mut h_read_cb = HashMap::new();
+        for r in records {
+            let freq = h_read_cb.entry(r.COUNT as usize).or_insert(0);
+            *freq += 1;
+        }
+        // let cu_umi = CUHistogram::new(h_read_cb);
+        h_read.insert(_cb, h_read_cb);
+    }
+    
+    Ok(h_read.into()  // conversion into a hashmap/dict
+    ) 
+
+}
+/// Counts frequencies of barcodes per cell.
+/// THIS IS NOT "PER BARCODE"
+/// Returns two dictionaries (each key is a barcode):
+/// - the frequency of a barcode in terms of UMIs
+/// - the frequency of a barcode in terms of reads
 #[pyfunction]
 fn make_ecs_cb(
-    busfile: &str, matrix_file: &str, transcript_file: &str, //t2g_file: &str, 
+    busfile: &str, matrix_file: &str, transcript_file: &str,
     // collapse_ec:bool,
 ) -> PyResult<(HashMap<usize, usize>, HashMap<usize, usize>)> {
 
@@ -87,275 +124,183 @@ fn make_ecs_cb(
     ) 
 }
 
-
+/// Counts frequencies of barcodes.
+/// Returns two dictionaries (each key is a barcode):
+/// - the frequency of a barcode in terms of UMIs
+/// - the frequency of a barcode in terms of reads
 #[pyfunction]
-fn cbumi_overlap(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<PyObject> {
+fn make_ecs_ec(busfile: &str, matrix_file: &str, transcript_file: &str, t2g_file: &str, collapse_ec:bool, mapping_mode: &str) -> PyResult<(HashMap<String, HashMap<usize, usize>>, HashMap<usize, usize>, HashMap<usize, usize>)> {
+    let folder = BusFolder::from_files(busfile, matrix_file, transcript_file);
 
-    let overlap = detect_cbumi_overlap(busfolders);
-    let pythondict = PyDict::new(py);
+    let results = if mapping_mode == "gene" {
+        make_ecs_ec_genemapping(folder, t2g_file, collapse_ec)
+    } else if mapping_mode == "transcript" {
+        make_ecs_ec_transcript_mapping(folder, collapse_ec)
+        
+    } else {
+        panic!("unkown mapping mode; needs to be [gene;transcript]")
+    };
 
-    for (k,v) in overlap {
-        // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyFrozenSet::new(py, k.iter())?;
-        pythondict.set_item(fset, v)?;
-    }
-    Ok(pythondict.to_object(py))
+    Ok(results)
 }
 
-#[pyfunction]
-fn cb_overlap(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<PyObject> {
+fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
+ -> (HashMap<String, HashMap<usize, usize>>, HashMap<usize, usize>, HashMap<usize, usize>) {
 
-    let overlap = detect_cb_overlap(busfolders);
-    let pythondict = PyDict::new(py);
+    println!("Making mapper");
+    let ecmapper = folder.make_mapper_transcript();
+    println!("Done Making mapper");
 
-    for (k,v) in overlap {
-        // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyFrozenSet::new(py, k.iter())?;
-        pythondict.set_item(fset, v)?;
-    }
-    Ok(pythondict.to_object(py))
-}
+    let mut h_read: HashMap<(TranscriptId, usize), usize> = HashMap::new();
+    let mut h_read_multimapped: HashMap<usize, usize> = HashMap::new();
+    let mut h_read_inconsistent: HashMap<usize, usize> = HashMap::new();
 
+    let all_transcripts = ecmapper.get_transcript_list();
 
-// #[pyclass]
-// struct MyIterator {
-//     iter: Box<dyn Iterator<Item = usize> + Send>,
-// }
-
-// #[pymethods]
-// impl MyIterator {
-
-//     #[new]
-//     fn new() -> Self {
-
-//         let iter = vec![0_usize,1,2,3,4]
-//             .iter()
-//             .map(|x| *x);
-//         MyIterator { iter: Box::new(iter) }
-//     }
-
-//     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
-//         slf
-//     }
-//     fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<PyObject> {
-//         let x = slf.iter.next();
-//         x.into()
-//     }
-// }
-
-// fn general_phantom_fingerprint<I,K>(h: HashMap<String, I>) -> (Vec<String>, HashMap<Vec<usize>, usize>, HashMap<Vec<usize>, usize>)
-
-/// Given a set of iterators over busfiles (keyed/grouped by CB, or CB+UMI) count how many
-/// keys overlap between busfiles
-pub fn general_detect_overlap<I,K>(h: HashMap<String, I>) -> HashMap<Vec<String>, usize> 
-where
-    I: Iterator<Item = (K, Vec<BusRecord>)>,
-    K: Ord + Eq + Debug + Copy,
-{
-    let multi_iter = MultiIterator::new(h);
-    let mut counter: HashMap<Vec<String>, usize> = HashMap::new();
-
-    let bar = get_spinner();
-    let interval = 100_000;
-
-    for (i, (_key, record_dict)) in multi_iter.enumerate() {
-        let mut the_set: Vec<String> = record_dict.keys().cloned().collect();
-        the_set.sort();
-        let val = counter.entry(the_set).or_insert(0);
-        *val += 1;
-
-        if i % interval == 0 {
-            bar.inc(interval as u64);
-        }
-    }
-    counter
-
-}
-pub fn detect_cbumi_overlap(busfolders: HashMap<String, String>) -> HashMap<Vec<String>, usize> {
-
-    let mut h = HashMap::new();
-    for (k,filename) in busfolders{
-        h.insert(k, BusReader::new(&filename).groupby_cbumi());
-    }
-    general_detect_overlap(h)
-}
-
-pub fn detect_cb_overlap(busfolders: HashMap<String, String>) -> HashMap<Vec<String>, usize> {
-
-    let mut h = HashMap::new();
-    for (k,filename) in busfolders{
-        h.insert(k, BusReader::new(&filename).groupby_cb());
-    }
-    general_detect_overlap(h)
-}
-
-pub fn detect_cbumi_overlap_old(busfolders: HashMap<String, String>) -> HashMap<Vec<String>, usize> {
-
-    let mut h = HashMap::new();
-    for (k,filename) in busfolders{
-        h.insert(k, BusReader::new(&filename).groupby_cbumi());
-    }
-
-    let multi_iter = MultiIterator::new(h);
-    let mut counter: HashMap<Vec<String>, usize> = HashMap::new();
-
-    let bar = get_spinner();
-    let interval = 100_000;
-
-    for (i, ((_cb, _umi), record_dict)) in multi_iter.enumerate() {
-        let mut the_set: Vec<String> = record_dict.keys().cloned().collect();
-        the_set.sort();
-        let val = counter.entry(the_set).or_insert(0);
-        *val += 1;
-
-        if i % interval == 0 {
-            bar.inc(interval as u64);
-        }
-    }
-    counter
-}
-
-pub fn detect_cb_overlap_old(busfolders: HashMap<String, String>) -> HashMap<Vec<String>, usize> {
-
-    let mut h = HashMap::new();
-    for (k,filename) in busfolders{
-        h.insert(k, BusReader::new(&filename).groupby_cb());
-    }
-
-    let multi_iter = MultiIterator::new(h);
-
-    let bar = get_spinner();
-    let interval = 100_000;
-
-    let mut counter: HashMap<Vec<String>, usize> = HashMap::new();
-
-    for (i, (_cb, record_dict)) in multi_iter.enumerate() {
-        let mut the_set: Vec<String> = record_dict.keys().cloned().collect();
-        the_set.sort();
-        let val = counter.entry(the_set).or_insert(0);
-        *val += 1;
-
-        if i % interval == 0 {
-            bar.inc(interval as u64);
-        }
-    }
-    counter
-}
-
-
-fn get_spinner() -> indicatif::ProgressBar{
-    let bar = indicatif::ProgressBar::new_spinner();
-    bar.set_style(
-        indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {pos} {per_sec}")
-            .unwrap()
-            .progress_chars("##-"),
-    );
-    bar
-}
-
-
-#[pyfunction]
-fn phantom_fingerprint_cb(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<(PyObject, PyObject, PyObject)> {
-
-    let (samplenames, fp_umi, fp_read ) = _phantom_fingerprint_cb(busfolders);
-    let pythondict_umi = PyDict::new(py);
-    let pythondict_reads = PyDict::new(py);
-
-    for (k,v) in fp_umi {
-        // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
-        pythondict_umi.set_item(fset, v)?;
-    }
-    for (k,v) in fp_read {
-        // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
-        pythondict_reads.set_item(fset, v)?;
-    }
-    Ok((samplenames.to_object(py), pythondict_umi.to_object(py), pythondict_reads.to_object(py)))
-}
-
-#[pyfunction]
-fn phantom_fingerprint_cbumi(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<(PyObject, PyObject, PyObject)> {
-
-    let (samplenames, fp_umi, fp_read ) = _phantom_fingerprint_cbumi(busfolders);
-    let pythondict_umi = PyDict::new(py);
-    let pythondict_reads = PyDict::new(py);
-
-    for (k,v) in fp_umi {
-        // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
-        pythondict_umi.set_item(fset, v)?;
-    }
-    for (k,v) in fp_read {
-        // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
-        pythondict_reads.set_item(fset, v)?;
-    }
-    Ok((samplenames.to_object(py), pythondict_umi.to_object(py), pythondict_reads.to_object(py)))
-}
-
-
-fn _phantom_fingerprint_cb(busfolders: HashMap<String, String>) -> (Vec<String>, HashMap<Vec<usize>, usize>, HashMap<Vec<usize>, usize>){
-    let mut h = HashMap::new();
-    for (k,filename) in busfolders{
-        h.insert(k, BusReader::new(&filename).groupby_cb());
-    }
-    general_phantom_fingerprint(h)
-}
-
-fn _phantom_fingerprint_cbumi(busfolders: HashMap<String, String>) -> (Vec<String>, HashMap<Vec<usize>, usize>, HashMap<Vec<usize>, usize>){
-    let mut h = HashMap::new();
-    for (k,filename) in busfolders{
-        h.insert(k, BusReader::new(&filename).groupby_cbumi());
-    }
-    general_phantom_fingerprint(h)
-}
-
-use std::fmt::Debug;
-
-fn general_phantom_fingerprint<I,K>(h: HashMap<String, I>) -> (Vec<String>, HashMap<Vec<usize>, usize>, HashMap<Vec<usize>, usize>)
-where
-    I: Iterator<Item = (K, Vec<BusRecord>)>,
-    K: Ord + Eq + Debug + Copy,
+    // iterate over all CB/UMI, and if the records map to a single gene
+    // add an entry of #reads per UMI into `h_read`
+    println!("Iterating cb/umi");
+    let spinner = get_spinner();
+    let mut counter = 0;
+    for (_cbumi, records) in folder.get_iterator().groupby_cbumi() {
     
-{
-    let samplenames: Vec<_> = h.keys().cloned().collect();
+        match find_consistent_transcripts(&records, &ecmapper) {
+            MappingResultTranscript::SingleTranscript(geneid) => {
+                let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
+                let v = h_read.entry((geneid, nreads as usize)).or_insert(0);
+                *v+=1;
+            },
+            MappingResultTranscript::Multimapped(_glist) => {
+                let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
+                let v = h_read_multimapped.entry(nreads as usize).or_insert(0);
+                *v+=1;
 
-    let multi_iter = MultiIterator::new(h);
+            },
+            MappingResultTranscript::Inconsistent => {
+                let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
+                let v = h_read_inconsistent.entry(nreads as usize).or_insert(0);
+                *v+=1;
 
-    let bar = get_spinner();
-    let interval = 100_000;
-
-    let mut umi_hist : HashMap<Vec<usize>, usize> = HashMap::new();
-    let mut read_hist : HashMap<Vec<usize>, usize> = HashMap::new();
-
-    for (i, (_cb, record_dict)) in multi_iter.enumerate() {
-
-        let mut  umi_fp = Vec::new();
-        let mut read_fp = Vec::new();
-
-        for s in samplenames.iter(){
-            let (numi, nreads) =match record_dict.get(s) {
-                Some(records) => {
-                    let numi = records.len();
-                    let nreads: u32 = records.iter().map(|r| r.COUNT).sum() ;
-                    (numi, nreads as usize)
-                },
-                None => (0,0),
-            };
-            umi_fp.push(numi);
-            read_fp.push(nreads);
+            },
         }
-        let val = umi_hist.entry(umi_fp).or_insert(0);
-        *val += 1;
-
-        let val = read_hist.entry(read_fp).or_insert(0);
-        *val += 1;
-
-        if i % interval == 0 {
-            bar.inc(interval as u64);
+        counter += 1;
+        if counter % 1_000_000 == 0{
+            spinner.inc(1_000_000)
         }
     }
-    (samplenames, umi_hist, read_hist)
+
+    // aggregate into a transcript -> CU_histogram map
+    let mut final_read: HashMap<TranscriptId, CUHistogram> = HashMap::new();
+    for ((tid, freq), count) in h_read {
+
+        if final_read.contains_key(&tid) {
+
+            // update existing hashmap
+            let h = final_read.get_mut(&tid).unwrap();
+            h.update(freq, count);
+
+        } else {
+            let mut inner = HashMap::new();
+            inner.insert(freq, count);
+            let h = CUHistogram::new(inner);
+            final_read.insert(tid, h);
+
+        }
+        // let h= final_read.entry(tid).or_insert()
+    }
+
+    // convert tid to actual trasncript name
+    let mut final_with_string: HashMap<String, HashMap<usize, usize>> = HashMap::new();
+    for (tid, cu) in final_read {
+        let ix = tid.0 as usize;
+        final_with_string.insert(all_transcripts[ix].0.clone(), cu.into());
+    }
+
+    (final_with_string, h_read_inconsistent, h_read_multimapped)
+}
+
+fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
+) -> (HashMap<String, HashMap<usize, usize>>, HashMap<usize, usize>, HashMap<usize, usize>) {
+
+    println!("Making mapper");
+    let ecmapper = folder.make_mapper(&t2g_file);
+    println!("Done Making mapper");
+    // let mapping_mode =  if collapse_ec{
+    //      MappingMode::Gene(ecmapper, InconsistentResolution::IgnoreInconsistent)
+    // } else {
+    //     MappingMode::EC(InconsistentResolution::IgnoreInconsistent)
+    // };
+
+    // let mapping_mode = MappingMode::Gene(ecmapper, InconsistentResolution::IgnoreInconsistent);
+
+    // let mut h_umi: HashMap<(GeneId, usize), usize> = HashMap::new();
+    let mut h_read: HashMap<(GeneId, usize), usize> = HashMap::new();
+    let mut h_read_multimapped: HashMap<usize, usize> = HashMap::new();
+    let mut h_read_inconsistent: HashMap<usize, usize> = HashMap::new();
+
+    let all_genes = ecmapper.get_gene_list();
+
+    // iterate over all CB/UMI, and if the records map to a single gene
+    // add an entry of #reads per UMI into `h_read`
+    println!("Iterating cb/umi");
+    let spinner = get_spinner();
+    let mut counter = 0;
+    for (_cbumi, records) in folder.get_iterator().groupby_cbumi() {
+    
+        match find_consistent(&records, &ecmapper) {
+            bustools::consistent_genes::MappingResult::SingleGene(geneid) => {
+                // increment that gene + single observation
+                // let v = h_umi.entry((geneid, 1)).or_insert(0);
+                // *v+=1;
+
+                let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
+                let v = h_read.entry((geneid, nreads as usize)).or_insert(0);
+                *v+=1;
+            },
+            bustools::consistent_genes::MappingResult::Multimapped(_glist) => {
+                let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
+                let v = h_read_multimapped.entry(nreads as usize).or_insert(0);
+                *v+=1;
+
+            },
+            bustools::consistent_genes::MappingResult::Inconsistent => {
+                let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
+                let v = h_read_inconsistent.entry(nreads as usize).or_insert(0);
+                *v+=1;
+
+            },
+        }
+        counter += 1;
+        if counter % 1_000_000 == 0{
+            spinner.inc(1_000_000)
+        }
+    }
+
+    // aggregate into a gene -> CU_histogram map
+    let mut final_read: HashMap<GeneId, CUHistogram> = HashMap::new();
+    for ((geneid, freq), count) in h_read {
+
+        if final_read.contains_key(&geneid) {
+
+            // update existing hashmap
+            let h = final_read.get_mut(&geneid).unwrap();
+            h.update(freq, count);
+
+        } else {
+            let mut inner = HashMap::new();
+            inner.insert(freq, count);
+            let h = CUHistogram::new(inner);
+            final_read.insert(geneid, h);
+
+        }
+        // let h= final_read.entry(geneid).or_insert()
+    }
+    // convert gene id to actual gene name
+    let mut final_with_string: HashMap<String, HashMap<usize, usize>> = HashMap::new();
+    for (geneid, cu) in final_read {
+        let ix = geneid.0 as usize;
+        final_with_string.insert(all_genes[ix].0.clone(), cu.into());
+    }
+
+    (final_with_string, h_read_inconsistent, h_read_multimapped)
 }

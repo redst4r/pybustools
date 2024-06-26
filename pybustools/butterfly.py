@@ -73,7 +73,10 @@ class CUHistogram():
         """
         return fraction of single copy molecules
         """
-        n1 = self.histogram[1]
+        import warnings
+        # warnings.warn("NOT SURE IF THIS IS CORRECT: divie by get_nreads() instead?")
+        # ACTUALLY IT IS CORRECT, its the Fraction of single-copy MOLECULES
+        n1 = self.histogram[1] if 1 in self.histogram else 0
         nTotal = self.get_nUMI()
         return n1/nTotal
 
@@ -369,19 +372,39 @@ def compare_histograms_OT(h1, h2):
     return ot.emd2(a, b, M)
 
 
-def plot_CU(CU, norm=True, label=None):
+def plot_CU(CU, norm=True, label=None, remove_zero=False, color=None):
+    """
+    plot the histogram
+
+    :param norm" y axis as absolute numbers of normalized to sum up to one (a probability distribution)
+    :param remove_zero: remove the histgram[0] entry, i.e. the items with size zero (usually unobservable). If true sets histogram[0]=0
+    """
     q = pd.Series(CU.histogram).sort_index()
+    if remove_zero:
+        q[0] = 0
     values = q.values
     if norm:
         values = values/values.sum()
+
+    # only plot items overserved at least once (y-axis)
     ix = values!=0
     plt.scatter(q.index[ix], values[ix])
     if label:
-        plt.plot(q.index[ix], values[ix], label=label)
+        if color:
+            plt.plot(q.index[ix], values[ix], label=label, c=color)
+        else:
+            plt.plot(q.index[ix], values[ix], label=label)
     else:
-        plt.plot(q.index[ix], values[ix])
+        if color:
+            plt.plot(q.index[ix], values[ix], c=color)
+        else:
+            plt.plot(q.index[ix], values[ix])
     plt.xlabel('Reads per UMI')
-    plt.ylabel('Fraction')
+
+    if norm:
+        plt.ylabel('Fraction')
+    else:
+        plt.ylabel('Absolute number')
 
 
 def saturation_curve(CU_aggr: CUHistogram, bins=20):

@@ -3,3 +3,4 @@ __pycache__
 pybustools.egg-info
 .pytest_cache
 build/
+.vim/coc-settings.json
