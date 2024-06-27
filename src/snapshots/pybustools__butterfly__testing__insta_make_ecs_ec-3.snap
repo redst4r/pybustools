@@ -1,0 +1,13 @@
+---
+source: src/butterfly.rs
+expression: cu_multi.0.get_histogram()
+---
+1: 796733
+2: 138961
+3: 27193
+4: 5418
+5: 1003
+6: 200
+7: 55
+8: 7
+9: 1

@@ -18,6 +18,7 @@ bustools="0.14"
 bustools_cli="0.3.1"
 # bustools_cli = { path = "/home/michi/Dropbox/rustbustools_cli" }
 #rustphantompurger = { path = "/home/michi/Dropbox/rustphantompurger" }
+insta = { version = "1.39.0", features = ["yaml"] }
 
 indicatif = "0.17"
 itertools="0.12"

@@ -1,6 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use bustools::{io::{BusFolder, BusReader, BusRecord}, iterators::{CbUmiGroupIterator, CellGroupIterator}, merger::MultiIterator, utils::int_to_seq};
-use itertools::Itertools;
 use pyo3::{prelude::*, types::{PyDict, PyFrozenSet}};
 use rand::Rng;
 use std::fmt::Debug;
@@ -246,7 +245,7 @@ pub (crate) fn count_reads_per_EC(py: Python<'_>,
     busfolder: &str, 
 ) -> PyResult<HashMap<usize, usize>> {
 
-    let bus = BusFolder::new(&busfolder);
+    let bus = BusFolder::new(busfolder);
     let mut ec_vector = HashMap::new();
 
     for (_cbumi, records) in bus.get_iterator().groupby_cbumi() {
