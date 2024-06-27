@@ -24,7 +24,16 @@ def make_saturation_curve_rust(busfolder: str,  bins, collapse_EC:bool, t2g: str
     """
     turns a busfolder into a saturation graph (faster as the backend is rust)
     """
-    ec_hist = make_ec_histograms_rust(Bus(busfolder, decode_seq=False), collapse_EC=collapse_EC, t2gfile=t2g)
+    bus = Bus(busfolder, decode_seq=False)
+    return make_saturation_curve_rust_2(bus,  bins, collapse_EC, t2g)
+
+def make_saturation_curve_rust_2(bus: Bus,  bins, collapse_EC:bool, t2g: str,):
+    """
+    turns a bus object into a saturation graph (faster as the backend is rust)
+    """
+    assert isinstance(bus, Bus) or isinstance(bus, _Bus)
+
+    ec_hist = make_ec_histograms_rust(bus, collapse_EC=collapse_EC, t2gfile=t2g)
     return saturation_curve(ec_hist, bins=bins)
 
 
@@ -79,6 +88,20 @@ class CUHistogram():
         n1 = self.histogram[1] if 1 in self.histogram else 0
         nTotal = self.get_nUMI()
         return n1/nTotal
+
+    def turing_saturation(self):
+        """
+        Turing estimator of the saturation.
+        FSCM() is the estimator for unseen species
+        """
+        return 1-self.FSCM()
+        
+    def cellranger_saturation(self):
+        """
+        the way cellranger calculates the saturation, 
+        not totally sure what this is based on
+        """
+        return  1- (self.get_nUMI()/self.get_nreads())
 
     def __eq__(self, other):
         """Overrides the default implementation"""
