@@ -18,7 +18,6 @@ impl pyo3::IntoPy<pyo3::PyObject> for MyCUHistogram {
 }
 
 
-
 #[pyfunction]
 /// Count the frequency of frequency for the CB/UMI in the specified busfolders.
 /// Essentially a wrapper around `butterfly::make_ecs`.
@@ -28,7 +27,6 @@ impl pyo3::IntoPy<pyo3::PyObject> for MyCUHistogram {
 pub (crate) fn make_ecs(busfile: &str, matrix_file: &str, transcript_file: &str, t2g_file: &str, collapse_ec:bool) -> PyResult<MyCUHistogram> {
 
     let folder = BusFolder::from_files(busfile, matrix_file, transcript_file);
-    
     let mode = if collapse_ec {
         // println!("Making mapper");
         let mapper = folder.make_mapper(t2g_file);
@@ -36,14 +34,10 @@ pub (crate) fn make_ecs(busfile: &str, matrix_file: &str, transcript_file: &str,
     } else {
         MappingMode::EC(InconsistentResolution::IgnoreInconsistent)
     };
-    // println!("Done Making mapper");
 
     let h = butterfly::make_ecs(&folder.get_busfile(), mode);
-    // println!("umis: {}", h.get_numis());
     Ok(MyCUHistogram(h))  // conversion into a hashmap/dict
 }
-
-
 
 
 /// Per barcode, creates a CUHistogram: In that cell, how often do you see a UMI with n_reads
@@ -57,14 +51,13 @@ pub (crate) fn make_ecs_across_cb(
     let mut h_read: HashMap<u64, MyCUHistogram> = HashMap::new();
     
     for (_cb, records) in folder.get_iterator().groupby_cb() {
-        let mut h_read_cb = HashMap::new();
+        let mut h_read_cb = CUHistogram::new(HashMap::new());
         for r in records {
-            let freq = h_read_cb.entry(r.COUNT as usize).or_insert(0);
-            *freq += 1;
+            h_read_cb.add_counts(r.COUNT as usize, 1);
         }
-        let cu = CUHistogram::new(h_read_cb);
+        // let cu = CUHistogram::new(h_read_cb);
         // a bit annoying: we have to wrap it so we can return to python
-        h_read.insert(_cb, MyCUHistogram(cu));
+        h_read.insert(_cb, MyCUHistogram(h_read_cb));
     }
     
     Ok(h_read  // conversion into a hashmap/dict
@@ -94,29 +87,16 @@ pub (crate) fn make_ecs_cb(
     // println!("Done Making mapper");
 
     // TODO work with the CUHistogram directly
-    // let h_umi = CUHistogram::new(HashMap::new());
-    // let h_read = CUHistogram::new(HashMap::new());
-
-    let mut h_umi: HashMap<usize, usize> = HashMap::new();
-    let mut h_read: HashMap<usize, usize> = HashMap::new();
+    let mut cu_umi = CUHistogram::new(HashMap::new());
+    let mut cu_reads = CUHistogram::new(HashMap::new());
 
     for (_cb, records) in folder.get_iterator().groupby_cb() {
         let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
-        let v = h_read.entry(nreads as usize).or_insert(0);
-        *v += 1;
-
-        // h_read.add_counts(nreads as usize, 1);
+        cu_reads.add_counts(nreads as usize, 1);
 
         let numi = records.len();
-        let v = h_umi.entry(numi).or_insert(0);
-        *v += 1;
-        // h_umi.add_counts(numi, 1);
-
-
+        cu_umi.add_counts(numi, 1);
     }
-    let cu_umi = CUHistogram::new(h_umi);
-    let cu_reads = CUHistogram::new(h_read);
-
     Ok(
         (MyCUHistogram(cu_umi), MyCUHistogram(cu_reads))  // conversion into a hashmap/dict
     ) 
@@ -152,8 +132,8 @@ fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
     println!("Done Making mapper");
 
     let mut h_read: HashMap<(TranscriptId, usize), usize> = HashMap::new();
-    let mut h_read_multimapped: HashMap<usize, usize> = HashMap::new();
-    let mut h_read_inconsistent: HashMap<usize, usize> = HashMap::new();
+    let mut h_read_multimapped = CUHistogram::new(HashMap::new());
+    let mut h_read_inconsistent=  CUHistogram::new(HashMap::new());
 
     let all_transcripts = ecmapper.get_transcript_list();
 
@@ -172,15 +152,11 @@ fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
             },
             MappingResultTranscript::Multimapped(_glist) => {
                 let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
-                let v = h_read_multimapped.entry(nreads as usize).or_insert(0);
-                *v+=1;
-
+                h_read_multimapped.add_counts(nreads as usize, 1);
             },
             MappingResultTranscript::Inconsistent => {
                 let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
-                let v = h_read_inconsistent.entry(nreads as usize).or_insert(0);
-                *v+=1;
-
+                h_read_inconsistent.add_counts(nreads as usize, 1);
             },
         }
         counter += 1;
@@ -206,7 +182,6 @@ fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
             final_read.insert(tid, h);
 
         }
-        // let h= final_read.entry(tid).or_insert()
     }
 
     // convert tid to actual trasncript name
@@ -216,7 +191,7 @@ fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
         final_with_string.insert(all_transcripts[ix].0.clone(), MyCUHistogram(cu));
     }
 
-    (final_with_string, MyCUHistogram(CUHistogram::new(h_read_inconsistent)), MyCUHistogram(CUHistogram::new(h_read_multimapped)))
+    (final_with_string, MyCUHistogram(h_read_inconsistent), MyCUHistogram(h_read_multimapped))
 }
 
 fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
@@ -235,8 +210,8 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
 
     // let mut h_umi: HashMap<(GeneId, usize), usize> = HashMap::new();
     let mut h_read: HashMap<(GeneId, usize), usize> = HashMap::new();
-    let mut h_read_multimapped: HashMap<usize, usize> = HashMap::new();
-    let mut h_read_inconsistent: HashMap<usize, usize> = HashMap::new();
+    let mut h_read_multimapped = CUHistogram::new(HashMap::new());
+    let mut h_read_inconsistent=  CUHistogram::new(HashMap::new());
 
     let all_genes = ecmapper.get_gene_list();
 
@@ -249,25 +224,18 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
     
         match find_consistent(&records, &ecmapper) {
             bustools::consistent_genes::MappingResult::SingleGene(geneid) => {
-                // increment that gene + single observation
-                // let v = h_umi.entry((geneid, 1)).or_insert(0);
-                // *v+=1;
-
                 let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
                 let v = h_read.entry((geneid, nreads as usize)).or_insert(0);
                 *v+=1;
             },
             bustools::consistent_genes::MappingResult::Multimapped(_glist) => {
                 let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
-                let v = h_read_multimapped.entry(nreads as usize).or_insert(0);
-                *v+=1;
+                h_read_multimapped.add_counts(nreads as usize, 1);
 
             },
             bustools::consistent_genes::MappingResult::Inconsistent => {
                 let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
-                let v = h_read_inconsistent.entry(nreads as usize).or_insert(0);
-                *v+=1;
-
+                h_read_inconsistent.add_counts(nreads as usize, 1);
             },
         }
         counter += 1;
@@ -302,7 +270,7 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
         final_with_string.insert(all_genes[ix].0.clone(), MyCUHistogram(cu));
     }
 
-    (final_with_string, MyCUHistogram(CUHistogram::new(h_read_inconsistent)), MyCUHistogram(CUHistogram::new(h_read_multimapped)))
+    (final_with_string, MyCUHistogram(h_read_inconsistent), MyCUHistogram(h_read_multimapped))
 }
 
 #[cfg(test)]
@@ -346,6 +314,7 @@ mod testing {
 
         let (cu_umi, cu_read) = make_ecs_cb(bus_file, matrix_file, transcript_file).unwrap();
 
+        println!("{:?}", cu_umi.0);
         // need to convert CUHist->hashmap
         insta::with_settings!({sort_maps => true}, {
             insta::assert_yaml_snapshot!((cu_umi.0.get_histogram(), cu_read.0.get_histogram()))

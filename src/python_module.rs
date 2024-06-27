@@ -13,7 +13,8 @@ fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs_cb, m)?)?;
     m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs_ec, m)?)?;
     m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs_across_cb, m)?)?;
-
+    m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs, m)?)?;
+    
     // m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cb, m)?)?;
     // m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cbumi, m)?)?;
     // m.add_function(wrap_pyfunction!(crate::phantom::rustphantom, m)?)?;
@@ -23,7 +24,7 @@ fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::counting::cb_overlap, m)?)?;
     m.add_function(wrap_pyfunction!(crate::counting::detect_cb_frequencies, m)?)?;
     m.add_function(wrap_pyfunction!(crate::counting::kmer_counter_cb, m)?)?;
-    m.add_function(wrap_pyfunction!(crate::counting::count_reads_per_EC, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::counting::count_reads_per_ec, m)?)?;
     
     Ok(())
 }

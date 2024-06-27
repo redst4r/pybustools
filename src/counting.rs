@@ -241,7 +241,7 @@ fn seq_to_kmers(s: &str, kmer_length: usize) -> Vec<String>{
 /// Filter busfiles for hopped reads. 
 /// If we detect a CB/UMI in more than one busfile, it gets filtered 
 /// (i.e. written to `busfiles_removed`) and NOT written to `busfiles_filtered`
-pub (crate) fn count_reads_per_EC(py: Python<'_>, 
+pub (crate) fn count_reads_per_ec(_py: Python<'_>, 
     busfolder: &str, 
 ) -> PyResult<HashMap<usize, usize>> {
 
