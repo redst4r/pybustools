@@ -32,4 +32,12 @@ q2 = pybustools.make_ecs_across_cb(
     '/home/michi/bus_testing/bus_output/output.corrected.sort.busz', 
     '/home/michi/bus_testing/bus_output/matrix.ec', 
     '/home/michi/bus_testing/bus_output/transcripts.txt')
+
+
+df = pybustools.estimate_tgt(
+    '/home/michi/bus_testing/bus_output/output.corrected.sort.busz', 
+    '/home/michi/bus_testing/bus_output/matrix.ec',
+    '/home/michi/bus_testing/bus_output/transcripts.txt',
+    '/home/michi/mounts/TB4drive/kallisto_resources_v50/t2g.txt'
+)
 */

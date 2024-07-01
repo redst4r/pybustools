@@ -1,6 +1,7 @@
-use std::collections::HashMap;
-use bustools::{consistent_genes::{find_consistent, GeneId, InconsistentResolution, MappingMode}, consistent_transcripts::{find_consistent_transcripts, MappingResultTranscript, TranscriptId}, io::BusFolder, iterators::{CbUmiGroupIterator, CellGroupIterator}};
+use std::collections::{HashMap, HashSet};
+use bustools::{consistent_genes::{find_consistent, GeneId, InconsistentResolution, MappingMode, MappingResult}, consistent_transcripts::{find_consistent_transcripts, MappingResultTranscript, TranscriptId}, io::{BusFolder, BusReader}, iterators::{CbUmiGroupIterator, CellGroupIterator}};
 use bustools_cli::butterfly::{self, CUHistogram};
+use itertools::Itertools;
 use pyo3::prelude::*;
 
 use crate::get_spinner;
@@ -272,6 +273,98 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
 
     (final_with_string, MyCUHistogram(h_read_inconsistent), MyCUHistogram(h_read_multimapped))
 }
+
+
+#[pyfunction]
+pub (crate) fn estimate_tgt(
+    busfile: &str, matrix_file: &str, transcript_file: &str, t2g_file: &str,
+    // collapse_ec:bool,
+) -> PyResult<pyo3_polars::PyDataFrame> {
+
+    let folder = BusFolder::from_files(busfile, matrix_file, transcript_file);
+    let ecmapper = folder.make_mapper(t2g_file);
+    let df = _estimate_tgt(busfile, MappingMode::Gene(ecmapper, InconsistentResolution::IgnoreInconsistent));
+
+    Ok(pyo3_polars::PyDataFrame(df))
+}
+
+
+use polars::prelude::*;
+
+/// Transcript per transcript
+/// 
+/// Per CB/UMI, how often do we run into inconsitennt gene mappings.
+/// This could be due to chimeras: The CB/UMI swapped to another mRNA and hence it's
+pub fn _estimate_tgt(busfile: &str, mapping_mode: MappingMode) -> DataFrame {
+
+    let mut cb_counter_pure: HashMap<u64, usize> = HashMap::new();
+    let mut cb_counter_inconsistent: HashMap<u64, usize> = HashMap::new();
+    let mut cb_counter_multi: HashMap<u64, usize> = HashMap::new();
+    let mut cbs_set = HashSet::new();
+
+    let reader = BusReader::new(busfile);
+
+    let mut pure = 0;
+    let mut multimapped = 0;
+    let mut inconsistent = 0;
+    let mut total = 0;
+
+    for ((_cb, _umi), recordlist) in reader.groupby_cbumi() {
+        total += 1;
+        cbs_set.insert(_cb);
+        match &mapping_mode {
+            // check if we can uniquely match those read to the same gene
+            // if not its either multimapped or inconsistent (could be a CB/UMI collision)            
+            MappingMode::Gene(ecmapper, _resolution_mode) => {
+                match find_consistent(&recordlist, ecmapper) {
+                    MappingResult::SingleGene(_) => {
+                        // increment our histogram
+                        pure += 1;
+                        let v = cb_counter_pure.entry(_cb).or_insert(0);
+                        *v+=1;
+
+                    }
+                    MappingResult::Multimapped(_) => {
+                        multimapped += 1;            
+                        let v = cb_counter_multi.entry(_cb).or_insert(0);
+                        *v+=1;
+                    }
+                    // inconsistent, i.e mapping to two distinct genes
+                    // the reasonable thin
+                    MappingResult::Inconsistent => {
+                        inconsistent += 1;
+                        let v = cb_counter_inconsistent.entry(_cb).or_insert(0);
+                        *v+=1;                        
+                    },
+                }
+            },
+            MappingMode::EC(_) => todo!(),
+            MappingMode::Transcript(_, _) => todo!(),
+        }
+    }
+
+    println!(
+        "Total CB-UMI {total}, pure {pure} ({}%), Multimapped {multimapped} ({}%), Discarded/Inconsistent {inconsistent} ({}%)",
+        100.0*(pure as f32) / (total as f32),
+        100.0*(multimapped as f32) / (total as f32),
+        100.0*(inconsistent as f32) / (total as f32)
+    );
+
+
+    let cbs = cbs_set.into_iter().collect_vec();
+    let series_pure = cbs.iter().map(|c| *cb_counter_pure.get(c).unwrap_or(&0) as u64).collect_vec(); 
+    let series_incons = cbs.iter().map(|c| *cb_counter_inconsistent.get(c).unwrap_or(&0) as u64).collect_vec(); 
+    let series_multi = cbs.iter().map(|c| *cb_counter_multi.get(c).unwrap_or(&0) as u64).collect_vec(); 
+
+    let df: DataFrame = df!(
+        "CB" => &cbs,
+        "pure" => series_pure,
+        "inconsistent" => &series_incons,
+        "multi" => &series_multi,
+    ).unwrap();
+    df
+}
+
 
 #[cfg(test)]
 mod testing {

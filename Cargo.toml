@@ -9,7 +9,7 @@ name = "pybustools"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.20.0"
+pyo3 = "0.21.0"
 
 # not sure why these were dependencies
 #numpy = "0.20.0"
@@ -23,7 +23,8 @@ bustools_cli="0.3.2"
 
 #rustphantompurger = { path = "/home/michi/Dropbox/rustphantompurger" }
 insta = { version = "1.39.0", features = ["yaml"] }
-
+polars = { version = "0.41"}
+pyo3-polars = "0.15"
 indicatif = "0.17"
 itertools="0.12"
 rand = "0.8"
