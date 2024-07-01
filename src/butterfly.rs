@@ -3,15 +3,20 @@ use bustools::{consistent_genes::{find_consistent, GeneId, InconsistentResolutio
 use bustools_cli::butterfly::{self, CUHistogram};
 use itertools::Itertools;
 use pyo3::prelude::*;
-
+use polars::prelude::*;
 use crate::get_spinner;
-
 
 /// A wrapper of bustools-cli::CUHistogram
 /// We need taht to implement a python conversion trait!
 pub (crate) struct MyCUHistogram(CUHistogram);
-/// Convenience, allows us to return CUHistograms directly
 
+// impl From<CUHistogram> for MyCUHistogram {
+//     fn from(value: CUHistogram) -> Self {
+//         MyCUHistogram(value)
+//     }
+// }
+
+/// Convenience, allows us to return CUHistograms directly
 impl pyo3::IntoPy<pyo3::PyObject> for MyCUHistogram {
     fn into_py(self, py: pyo3::Python<'_>) -> pyo3::PyObject {
         self.0.get_histogram().to_object( py )
@@ -52,7 +57,7 @@ pub (crate) fn make_ecs_across_cb(
     let mut h_read: HashMap<u64, MyCUHistogram> = HashMap::new();
     
     for (_cb, records) in folder.get_iterator().groupby_cb() {
-        let mut h_read_cb = CUHistogram::new(HashMap::new());
+        let mut h_read_cb = CUHistogram::new();
         for r in records {
             h_read_cb.add_counts(r.COUNT as usize, 1);
         }
@@ -60,11 +65,9 @@ pub (crate) fn make_ecs_across_cb(
         // a bit annoying: we have to wrap it so we can return to python
         h_read.insert(_cb, MyCUHistogram(h_read_cb));
     }
-    
-    Ok(h_read  // conversion into a hashmap/dict
-    ) 
-
+    Ok(h_read)  // conversion into a hashmap/dict
 }
+
 /// Counts frequencies of barcodes per cell.
 /// THIS IS NOT "PER BARCODE"
 /// Returns two dictionaries (each key is a barcode):
@@ -88,8 +91,8 @@ pub (crate) fn make_ecs_cb(
     // println!("Done Making mapper");
 
     // TODO work with the CUHistogram directly
-    let mut cu_umi = CUHistogram::new(HashMap::new());
-    let mut cu_reads = CUHistogram::new(HashMap::new());
+    let mut cu_umi = CUHistogram::new();
+    let mut cu_reads = CUHistogram::new();
 
     for (_cb, records) in folder.get_iterator().groupby_cb() {
         let nreads: u32 = records.iter().map(|r| r.COUNT).sum();
@@ -120,7 +123,6 @@ pub (crate) fn make_ecs_ec(busfile: &str, matrix_file: &str, transcript_file: &s
     } else {
         panic!("unkown mapping mode; needs to be [gene;transcript]")
     };
-
     Ok(results)
 }
 
@@ -133,8 +135,8 @@ fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
     println!("Done Making mapper");
 
     let mut h_read: HashMap<(TranscriptId, usize), usize> = HashMap::new();
-    let mut h_read_multimapped = CUHistogram::new(HashMap::new());
-    let mut h_read_inconsistent=  CUHistogram::new(HashMap::new());
+    let mut h_read_multimapped = CUHistogram::new();
+    let mut h_read_inconsistent=  CUHistogram::new();
 
     let all_transcripts = ecmapper.get_transcript_list();
 
@@ -179,7 +181,7 @@ fn make_ecs_ec_transcript_mapping(folder: BusFolder, collapse_ec:bool)
         } else {
             let mut inner = HashMap::new();
             inner.insert(freq, count);
-            let h = CUHistogram::new(inner);
+            let h = CUHistogram::from(inner);
             final_read.insert(tid, h);
 
         }
@@ -211,8 +213,8 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
 
     // let mut h_umi: HashMap<(GeneId, usize), usize> = HashMap::new();
     let mut h_read: HashMap<(GeneId, usize), usize> = HashMap::new();
-    let mut h_read_multimapped = CUHistogram::new(HashMap::new());
-    let mut h_read_inconsistent=  CUHistogram::new(HashMap::new());
+    let mut h_read_multimapped = CUHistogram::new();
+    let mut h_read_inconsistent=  CUHistogram::new();
 
     let all_genes = ecmapper.get_gene_list();
 
@@ -258,7 +260,7 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
         } else {
             let mut inner = HashMap::new();
             inner.insert(freq, count);
-            let h = CUHistogram::new(inner);
+            let h = CUHistogram::from(inner);
             final_read.insert(geneid, h);
 
         }
@@ -287,9 +289,6 @@ pub (crate) fn estimate_tgt(
 
     Ok(pyo3_polars::PyDataFrame(df))
 }
-
-
-use polars::prelude::*;
 
 /// Transcript per transcript
 /// 

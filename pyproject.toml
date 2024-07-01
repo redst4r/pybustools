@@ -7,7 +7,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
     "Private :: Do Not Upload",
 ]
-version="0.2.1"
+version="0.2.2"
 dependencies = [
     "gmpy2",
     "toolz",
@@ -16,6 +16,7 @@ dependencies = [
     "scipy",
     "matplotlib",
     "h5py",
+    'polars',  # for the pyo3 table conversion
 ]
 authors = [
     {name = "redst4r", email = "redst4r@web.de"},
