@@ -18,7 +18,7 @@ pyo3 = "0.21.0"
 
 bustools="0.14"
 #bustools = { path = "/home/michi/Dropbox/rustbustools" }
-bustools_cli="0.4"
+bustools_cli="0.5"
 #bustools_cli = { path = "/home/michi/Dropbox/rustbustools_cli" }
 
 rustphantompurger = { path = "/home/michi/Dropbox/rustphantompurger" }
@@ -26,5 +26,5 @@ insta = { version = "1.39.0", features = ["yaml"] }
 polars = { version = "0.41"}
 pyo3-polars = "0.15"
 indicatif = "0.17"
-itertools="0.12"
+itertools="0.13.0"
 rand = "0.8"

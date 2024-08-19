@@ -1,3 +1,6 @@
+use std::{collections::{HashMap, HashSet}, time::Instant};
+
+use bustools_cli::correct::{build_correct_map, load_whitelist};
 use pyo3::prelude::*;
 
 /// Quck howto
@@ -27,5 +30,33 @@ fn pybustools(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::counting::kmer_counter_cb, m)?)?;
     m.add_function(wrap_pyfunction!(crate::counting::count_reads_per_ec, m)?)?;
     
+    m.add_function(wrap_pyfunction!(cb_correct, m)?)?;
     Ok(())
+}
+
+#[pyfunction]
+/// Creates a error correction mapping of Cell barcodes (CBs) based on a whitelist
+/// of CBs.
+/// In particular it corrects every CB if its max 1-hamming away from one (*and only one*) whitelisted CB
+/// (sometimes a seqeuence can be 1-hamming away from two whitelisted CBs )
+pub (crate) fn cb_correct(_py: Python<'_>, cb_list: HashSet<String>, whitelist_fname: &str) -> PyResult<HashMap<String, String>> {
+
+    println!("Loading whitelist");
+    let whitelist = load_whitelist(whitelist_fname);
+    println!("Done Loading whitelist");
+
+    let t = Instant::now();
+    let corrector = build_correct_map(&cb_list, &whitelist);
+
+    println!("Build corrector: {} sec", t.elapsed().as_secs());
+    // convert to strings
+    let mut corrector_seqs = HashMap::new();
+    for (cb_candidate, cb_true) in corrector {
+        corrector_seqs.insert(
+            bustools::utils::int_to_seq(cb_candidate, 16),
+            bustools::utils::int_to_seq(cb_true, 16)
+        );
+    }
+
+    Ok(corrector_seqs)
 }
