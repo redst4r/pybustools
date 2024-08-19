@@ -9,9 +9,6 @@ from pybustools.pybus import iterate_CB_UMI_of_busfile, Bus, _Bus, records_to_ge
 from pybustools.busio import Bus_record
 from pybustools.utils import read_t2g
 # t2gfile='/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt'
-import tempfile
-import subprocess
-import sys
 
 import pybustools.pybustools as rustbus
 def make_ec_histograms_rust(busfolder: Bus, collapse_EC: bool, t2gfile:str):
@@ -109,6 +106,17 @@ class CUHistogram():
             return self.histogram == other.histogram
         return False
 
+
+    def to_file(self, fname):
+        """Writes the CU Histgram to a csv. can be read via `.from_file()`"""
+        dfCU = pd.DataFrame(self.histogram.items(), columns=['abundance', 'frequency']).sort_values('abundance')
+        dfCU.to_csv(fname, index=False)
+
+    def from_file(fname):
+        """Read the CU Histgram from a csv (created via `.to_file()`"""
+
+        d = pd.read_csv(fname).set_index('abundance').frequency.to_dict()
+        return CUHistogram(d)
 
 def prune_CU(CU:CUHistogram, cutoff_freq=0.0):
     """
