@@ -1,8 +1,6 @@
-use std::{collections::HashMap, hash::Hash};
-use bustools::{consistent_genes::{find_consistent, GeneId, InconsistentResolution, MappingMode, EC}, consistent_transcripts::{find_consistent_transcripts, MappingResultTranscript, TranscriptId}, io::{BusFolder, BusReader, BusRecord, BusWriter, BusWriterPlain}, iterators::{CbUmiGroupIterator, CellGroupIterator}, merger::MultiIterator, utils::int_to_seq};
-use bustools_cli::butterfly::{self, CUHistogram};
-use pyo3::{prelude::*, types::{PyDict, PyFrozenSet, PyTuple}};
-use rand::Rng;
+use std::collections::HashMap;
+use bustools::{io::{BusFolder, BusReader, BusRecord, BusWriterPlain}, iterators::{CbUmiGroupIterator, CellGroupIterator}, merger::MultiIterator};
+use pyo3::{prelude::*, types::{PyDict, PyList, PyTuple}};
 use rustphantompurger::phantompurger::make_fingerprint_histogram;
 use std::fmt::Debug;
 
@@ -22,43 +20,45 @@ use crate::get_spinner;
 /// - samplenames
 /// - Histogram of fingerprints (measured in UMI abundance)
 /// - Histogram of fingerprints (measured in read abundance)
-pub (crate) fn phantom_fingerprint_cb(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<(PyObject, PyObject, PyObject)> {
+pub (crate) fn phantom_fingerprint_cb(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<(Bound<PyList>, Bound<PyDict>, Bound<PyDict>)> {
 
     let (samplenames, fp_umi, fp_read ) = _phantom_fingerprint_cb(busfolders);
-    let pythondict_umi = PyDict::new(py);
-    let pythondict_reads = PyDict::new(py);
+    let pythondict_umi = PyDict::new_bound(py);
+    let pythondict_reads = PyDict::new_bound(py);
 
     for (k,v) in fp_umi {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
+        let fset = PyTuple::new_bound(py, k.iter());
         pythondict_umi.set_item(fset, v)?;
     }
     for (k,v) in fp_read {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
+        let fset = PyTuple::new_bound(py, k.iter());
         pythondict_reads.set_item(fset, v)?;
     }
-    Ok((samplenames.to_object(py), pythondict_umi.to_object(py), pythondict_reads.to_object(py)))
+    let py_samplenames = PyList::new_bound(py, samplenames.iter());
+    Ok((py_samplenames, pythondict_umi, pythondict_reads))
 }
 
 #[pyfunction]
-pub (crate)  fn phantom_fingerprint_cbumi(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<(PyObject, PyObject, PyObject)> {
+pub (crate) fn phantom_fingerprint_cbumi(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<(Bound<PyList>, Bound<PyDict>, Bound<PyDict>)> {
 
     let (samplenames, fp_umi, fp_read ) = _phantom_fingerprint_cbumi(busfolders);
-    let pythondict_umi = PyDict::new(py);
-    let pythondict_reads = PyDict::new(py);
+    let pythondict_umi = PyDict::new_bound(py);
+    let pythondict_reads = PyDict::new_bound(py);
 
     for (k,v) in fp_umi {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
+        let fset = PyTuple::new_bound(py, k.iter());
         pythondict_umi.set_item(fset, v)?;
     }
     for (k,v) in fp_read {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
+        let fset = PyTuple::new_bound(py, k.iter());
         pythondict_reads.set_item(fset, v)?;
     }
-    Ok((samplenames.to_object(py), pythondict_umi.to_object(py), pythondict_reads.to_object(py)))
+    let py_samplenames = PyList::new_bound(py, samplenames.iter());
+    Ok((py_samplenames, pythondict_umi, pythondict_reads))
 }
 
 
@@ -142,7 +142,7 @@ where
 /// Filter busfiles for hopped reads. 
 /// If we detect a CB/UMI in more than one busfile, it gets filtered 
 /// (i.e. written to `busfiles_removed`) and NOT written to `busfiles_filtered`
-pub (crate)  fn rustphantom_filter(py: Python<'_>, 
+pub (crate)  fn rustphantom_filter(_py: Python<'_>, 
     busfiles_input: HashMap<String, String>, 
     busfiles_filtered: HashMap<String, String>, 
     busfiles_removed: HashMap<String, String>, 
@@ -210,7 +210,7 @@ pub (crate)  fn rustphantom_filter(py: Python<'_>,
 
 // SLOW due to EC mapping
 #[pyfunction]
-pub (crate) fn rustphantom(py: Python<'_>, busfolders: HashMap<String, String>, t2gfile: &str) -> PyResult<(PyObject, PyObject)> {
+pub (crate) fn rustphantom<'py>(py: Python<'py>, busfolders: HashMap<String, String>, t2gfile: &str) -> PyResult<(Bound<'py,PyList>, Bound<'py,PyDict>)> {
     
     let mut h = HashMap::new();
     for (k,filename) in busfolders{
@@ -230,13 +230,14 @@ pub (crate) fn rustphantom(py: Python<'_>, busfolders: HashMap<String, String>, 
     // histogram needs to be converted, its keys are lists atm, whihc cant be hashed in python
 
 
-    let pythondict = PyDict::new(py);
+    let pythondict = PyDict::new_bound(py);
 
     for (k,v) in histogram {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyTuple::new(py, k.iter());
+        let fset = PyTuple::new_bound(py, k.iter());
         pythondict.set_item(fset, v)?;
     }
-    Ok((samplenames.to_object(py), pythondict.to_object(py)))
+    let py_samples = PyList::new_bound(py, samplenames.iter());
+    Ok((py_samples, pythondict))
 }
 

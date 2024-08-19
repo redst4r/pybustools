@@ -24,7 +24,7 @@ def read_t2g(t2g_file):
     reading the kallisto trnascript2gene file
     :returns: a dataframe with transcript id, gene id and gene symbol
     """
-    df = pd.read_csv(t2g_file, sep='\t', header=None, names=['transcript_id', 'ensembl_id', 'gene_symbol'])
+    df = pd.read_csv(t2g_file, sep='\t', header=None, names=['transcript_id', 'ensembl_id', 'gene_symbol'], usecols=[0,1,2])  #usecols in case theres extra columns
 #     t2g_dict = df.set_index('transcript_id')['gene_symbol'].to_dict()
     # t2g_dict = df.set_index('transcript_id')['ensembl_id'].to_dict()
     return df

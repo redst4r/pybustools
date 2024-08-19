@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
-use bustools::{consistent_genes::{find_consistent, GeneId, InconsistentResolution, MappingMode, MappingResult}, consistent_transcripts::{find_consistent_transcripts, MappingResultTranscript, TranscriptId}, io::{BusFolder, BusReader}, iterators::{CbUmiGroupIterator, CellGroupIterator}};
+use std::collections::{BTreeSet, HashMap, HashSet};
+use bustools::{consistent_genes::{find_consistent, GeneId, Genename, InconsistentResolution, MappingMode, MappingResult, EC}, consistent_transcripts::{find_consistent_transcripts, MappingResultTranscript, TranscriptId}, io::{BusFolder, BusReader}, iterators::{CbUmiGroupIterator, CellGroupIterator}};
 use bustools_cli::butterfly::{self, CUHistogram};
 use itertools::Itertools;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::{PyDict, PyTuple}};
 use polars::prelude::*;
 use crate::get_spinner;
 
@@ -278,28 +278,52 @@ fn make_ecs_ec_genemapping(folder: BusFolder, t2g_file: &str, collapse_ec:bool
 
 
 #[pyfunction]
-pub (crate) fn estimate_tgt(
+pub (crate) fn estimate_tgt<'py>(py: Python<'py>, 
     busfile: &str, matrix_file: &str, transcript_file: &str, t2g_file: &str,
     // collapse_ec:bool,
-) -> PyResult<pyo3_polars::PyDataFrame> {
+) -> PyResult<(pyo3_polars::PyDataFrame, Bound<'py, PyDict>, Bound<'py, PyDict>)> {
 
     let folder = BusFolder::from_files(busfile, matrix_file, transcript_file);
     let ecmapper = folder.make_mapper(t2g_file);
-    let df = _estimate_tgt(busfile, MappingMode::Gene(ecmapper, InconsistentResolution::IgnoreInconsistent));
+    let (df, multi_counter, inconsistent_counter) = _estimate_tgt(busfile, MappingMode::Gene(ecmapper, InconsistentResolution::IgnoreInconsistent));
+    
+    // multi_counter.to_object();
+    let multi_counter_python = PyDict::new_bound(py);
+    for (k, v) in multi_counter {
+        let genes = k.into_iter().map(|g| g.0).collect_vec();
+        let s = PyTuple::new_bound(py, genes.iter());
+        multi_counter_python.set_item(s, v).unwrap();
+    }
 
-    Ok(pyo3_polars::PyDataFrame(df))
+    let inconsistent_counter_python = PyDict::new_bound(py);
+    for (k, v) in inconsistent_counter {
+        let ecs = k.into_iter().map(|g| g.0).collect_vec();
+        let s = PyTuple::new_bound(py, ecs.iter());
+        inconsistent_counter_python.set_item(s, v).unwrap();
+    }
+
+    Ok(
+        (pyo3_polars::PyDataFrame(df), multi_counter_python, inconsistent_counter_python)
+    )
 }
 
 /// Transcript per transcript
 /// 
 /// Per CB/UMI, how often do we run into inconsitennt gene mappings.
 /// This could be due to chimeras: The CB/UMI swapped to another mRNA and hence it's
-pub fn _estimate_tgt(busfile: &str, mapping_mode: MappingMode) -> DataFrame {
+pub fn _estimate_tgt(busfile: &str, mapping_mode: MappingMode) -> (DataFrame, HashMap<BTreeSet<Genename>, usize>, HashMap<BTreeSet<EC>, usize>) {
 
     let mut cb_counter_pure: HashMap<u64, usize> = HashMap::new();
     let mut cb_counter_inconsistent: HashMap<u64, usize> = HashMap::new();
     let mut cb_counter_multi: HashMap<u64, usize> = HashMap::new();
     let mut cbs_set = HashSet::new();
+
+    // how often do we see a particular set of genes multimapped (i.e. we couldnt decided which one it is)
+    let mut multimap_counter: HashMap<BTreeSet<Genename>, usize> = HashMap::new();
+
+    // cant really report the inconsistent genes (would require solving a LinearProgram), just return the ECs that are inconsistent for new
+    let mut inconsistent_counter: HashMap<BTreeSet<EC>, usize> = HashMap::new();
+
 
     let reader = BusReader::new(busfile);
 
@@ -321,19 +345,34 @@ pub fn _estimate_tgt(busfile: &str, mapping_mode: MappingMode) -> DataFrame {
                         pure += 1;
                         let v = cb_counter_pure.entry(_cb).or_insert(0);
                         *v+=1;
-
                     }
-                    MappingResult::Multimapped(_) => {
+                    MappingResult::Multimapped(_genes) => {
                         multimapped += 1;            
                         let v = cb_counter_multi.entry(_cb).or_insert(0);
                         *v+=1;
+
+                        if _genes.len() <= 1 {
+                            println!("{recordlist:?}");
+                            println!("{_genes:?}" );
+                            // panic!("BLA")
+                        }
+                       
+                        let genenames: BTreeSet<_> = _genes.into_iter().map(|gene_id|  ecmapper.resolve_gene_id(gene_id)).collect();
+                        let v = multimap_counter.entry(genenames).or_insert(0);
+                        *v += 1;
                     }
                     // inconsistent, i.e mapping to two distinct genes
                     // the reasonable thin
                     MappingResult::Inconsistent => {
                         inconsistent += 1;
                         let v = cb_counter_inconsistent.entry(_cb).or_insert(0);
-                        *v+=1;                        
+                        *v+=1;    
+
+
+                        let ecs: BTreeSet<EC> = recordlist.iter().map(|r| EC(r.EC)).collect();
+                        let v = inconsistent_counter.entry(ecs).or_insert(0);
+                        *v+=1;
+
                     },
                 }
             },
@@ -361,7 +400,7 @@ pub fn _estimate_tgt(busfile: &str, mapping_mode: MappingMode) -> DataFrame {
         "inconsistent" => &series_incons,
         "multi" => &series_multi,
     ).unwrap();
-    df
+    (df, multimap_counter, inconsistent_counter)
 }
 
 

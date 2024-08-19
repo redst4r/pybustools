@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pybustools(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs_cb, m)?)?;
     m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs_ec, m)?)?;
@@ -16,10 +16,10 @@ fn pybustools(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::butterfly::make_ecs, m)?)?;
     m.add_function(wrap_pyfunction!(crate::butterfly::estimate_tgt, m)?)?;
     
-    // m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cb, m)?)?;
-    // m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cbumi, m)?)?;
-    // m.add_function(wrap_pyfunction!(crate::phantom::rustphantom, m)?)?;
-    // m.add_function(wrap_pyfunction!(crate::phantom::rustphantom_filter, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cb, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::phantom::phantom_fingerprint_cbumi, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::phantom::rustphantom, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::phantom::rustphantom_filter, m)?)?;
 
     m.add_function(wrap_pyfunction!(crate::counting::cbumi_overlap, m)?)?;
     m.add_function(wrap_pyfunction!(crate::counting::cb_overlap, m)?)?;

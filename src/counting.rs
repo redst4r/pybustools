@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use bustools::{io::{BusFolder, BusReader, BusRecord}, iterators::{CbUmiGroupIterator, CellGroupIterator}, merger::MultiIterator, utils::int_to_seq};
-use pyo3::{prelude::*, types::{PyDict, PyFrozenSet}};
+use pyo3::{prelude::*, types::{IntoPyDict, PyDict, PyFrozenSet}};
 use rand::Rng;
 use std::fmt::Debug;
 
@@ -35,33 +35,34 @@ use crate::get_spinner;
 #[pyfunction]
 /// Calculates the overlap of busfiles in terms of their CB/UMI 
 /// (not considering their frequencies, as does `phantom_fingerprint_cb`)
-pub (crate) fn cbumi_overlap(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<PyObject> {
+pub (crate) fn cbumi_overlap(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<Bound<PyDict>> {
 
     let overlap = detect_cbumi_overlap(busfolders);
-    let pythondict = PyDict::new(py);
+    let pythondict = PyDict::new_bound(py);
 
     for (k,v) in overlap {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyFrozenSet::new(py, k.iter())?;
+        let fset = PyFrozenSet::new_bound(py, k.iter())?;
         pythondict.set_item(fset, v)?;
     }
-    Ok(pythondict.to_object(py))
+    Ok(pythondict.into_py_dict_bound(py))
 }
 
 #[pyfunction]
 /// Calculates the overlap of busfiles in terms of their CBs. 
 /// (not considering their frequencies, as does `phantom_fingerprint_cb`)
-pub (crate) fn cb_overlap(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<PyObject> {
+pub (crate) fn cb_overlap(py: Python<'_>, busfolders: HashMap<String, String>) -> PyResult<Bound<PyDict>> {
 
     let overlap = detect_cb_overlap(busfolders);
-    let pythondict = PyDict::new(py);
+    let pythondict = PyDict::new_bound(py);
 
     for (k,v) in overlap {
         // need to convert it to a frozenSet explicitly (regular sets cant be hashed in python)
-        let fset = PyFrozenSet::new(py, k.iter())?;
+        let fset = PyFrozenSet::new_bound(py, k.iter())?;
         pythondict.set_item(fset, v)?;
     }
-    Ok(pythondict.to_object(py))
+    // Ok(pythondict.to_object(py))
+    Ok(pythondict.into_py_dict_bound(py))
 }
 
 
@@ -224,16 +225,17 @@ pub (crate) fn kmer_counter_cb(busfile: &str, kmer_size: usize, fraction: f64) -
     (kmer_counter2, base_counter)
 }
 
-fn seq_to_kmers(s: &str, kmer_length: usize) -> Vec<String>{
-    /*
-    highly annoying due to the UTF-8 BS...
-    also very slow, creates alot of String instances on the way
-     */
-    // let kmers: Vec<_> = s.as_bytes().windows(kmer_length).collect();
-    let t: Vec<_> = s.chars().collect();
-    t.windows(kmer_length).map(String::from_iter).collect()
-    // kmers
-}
+
+// fn seq_to_kmers(s: &str, kmer_length: usize) -> Vec<String>{
+//     /*
+//     highly annoying due to the UTF-8 BS...
+//     also very slow, creates alot of String instances on the way
+//      */
+//     // let kmers: Vec<_> = s.as_bytes().windows(kmer_length).collect();
+//     let t: Vec<_> = s.chars().collect();
+//     t.windows(kmer_length).map(String::from_iter).collect()
+//     // kmers
+// }
 
 
 
