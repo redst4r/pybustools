@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use bustools::{io::{BusFolder, BusReader, BusRecord, BusWriterPlain}, iterators::{CbUmiGroupIterator, CellGroupIterator}, merger::MultiIterator};
 use pyo3::{prelude::*, types::{PyDict, PyList, PyTuple}};
-use rustphantompurger::phantompurger::make_fingerprint_histogram;
+use phantompurger_rs::phantompurger::make_fingerprint_histogram;
 use std::fmt::Debug;
 
 use crate::get_spinner;
